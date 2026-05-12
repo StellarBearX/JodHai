@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2, Bot, User as UserIcon, ImagePlus, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
-import { sendChatMessage, sendChatImage } from '../services/api';
+import { sendChatMessage, sendChatImage, isChatQuestion } from '../services/api';
 import type { Transaction } from '@jod-hai/shared';
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -13,34 +13,22 @@ const CATEGORY_EMOJI: Record<string, string> = {
 const SUGGESTIONS = ['กาแฟ 65', 'ข้าวกลางวัน 120', 'รับเงินเดือน 25000', 'ค่าน้ำมัน 500', 'Netflix 299'];
 
 interface TextMessage {
-  id: string;
-  kind: 'text';
-  role: 'user' | 'bot';
-  text: string;
-  timestamp: Date;
+  id: string; kind: 'text'; role: 'user' | 'bot'; text: string; timestamp: Date;
 }
 interface ImageMessage {
-  id: string;
-  kind: 'image';
-  role: 'user';
-  preview: string;
-  timestamp: Date;
+  id: string; kind: 'image'; role: 'user'; preview: string; timestamp: Date;
 }
 interface TxMessage {
-  id: string;
-  kind: 'tx';
-  role: 'bot';
-  transaction: Transaction;
-  usedTraining: boolean;
-  timestamp: Date;
+  id: string; kind: 'tx'; role: 'bot'; transaction: Transaction;
+  usedTraining: boolean; autoLearned: boolean; timestamp: Date;
 }
 type ChatMessage = TextMessage | ImageMessage | TxMessage;
 
-const WELCOME: ChatMessage = {
-  id: 'welcome', kind: 'text', role: 'bot',
-  text: 'สวัสดีครับ! 👋 พิมพ์รายการ หรือส่งรูปสลิป/ใบเสร็จได้เลย',
-  timestamp: new Date(),
-};
+const mk = <T extends object>(base: T): T & { id: string; timestamp: Date } => ({
+  ...base, id: crypto.randomUUID(), timestamp: new Date(),
+});
+
+const WELCOME: ChatMessage = mk({ kind: 'text' as const, role: 'bot' as const, text: 'สวัสดีค่ะ! 👋 พิมพ์รายการ หรือส่งรูปสลิป/ใบเสร็จได้เลยนะคะ' });
 
 export default function Chat() {
   const { user, loadDashboard, loadTransactions } = useAppStore();
@@ -55,9 +43,7 @@ export default function Chat() {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  const addMessage = useCallback((msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
-    setMessages((prev) => [...prev, { ...msg, id: crypto.randomUUID(), timestamp: new Date() } as ChatMessage]);
-  }, []);
+  const push = useCallback((msg: ChatMessage) => setMessages((p) => [...p, msg]), []);
 
   const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -78,30 +64,30 @@ export default function Chat() {
     setInput('');
     setSending(true);
 
-    if (imagePreview) {
-      addMessage({ kind: 'image', role: 'user', preview: imagePreview.preview });
-      const img = imagePreview;
-      setImagePreview(null);
-      try {
+    try {
+      if (imagePreview) {
+        push(mk({ kind: 'image', role: 'user', preview: imagePreview.preview }));
+        const img = imagePreview;
+        setImagePreview(null);
         const res = await sendChatImage(user.lineUserId, user.displayName, img.base64, img.mime);
-        addMessage({ kind: 'tx', role: 'bot', transaction: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, usedTraining: res.usedTraining });
-        loadDashboard(); loadTransactions();
-      } catch {
-        addMessage({ kind: 'text', role: 'bot', text: '⚠️ อ่านรูปไม่ได้ ลองใหม่อีกครั้ง' });
-      }
-    } else {
-      addMessage({ kind: 'text', role: 'user', text });
-      try {
-        const res = await sendChatMessage(user.lineUserId, user.displayName, text);
-        if (res.transaction) {
-          addMessage({ kind: 'tx', role: 'bot', transaction: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, usedTraining: res.usedTraining });
-          loadDashboard(); loadTransactions();
+        if (isChatQuestion(res)) {
+          push(mk({ kind: 'text', role: 'bot', text: res.question }));
         } else {
-          addMessage({ kind: 'text', role: 'bot', text: 'ขอโทษนะ ไม่เข้าใจข้อความนี้ ลองใหม่อีกครั้ง' });
+          push(mk({ kind: 'tx', role: 'bot', transaction: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, usedTraining: res.usedTraining, autoLearned: res.autoLearned }));
+          loadDashboard(); loadTransactions();
         }
-      } catch {
-        addMessage({ kind: 'text', role: 'bot', text: '⚠️ เกิดข้อผิดพลาด กรุณาลองใหม่' });
+      } else {
+        push(mk({ kind: 'text', role: 'user', text }));
+        const res = await sendChatMessage(user.lineUserId, user.displayName, text);
+        if (isChatQuestion(res)) {
+          push(mk({ kind: 'text', role: 'bot', text: res.question }));
+        } else {
+          push(mk({ kind: 'tx', role: 'bot', transaction: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, usedTraining: res.usedTraining, autoLearned: res.autoLearned }));
+          loadDashboard(); loadTransactions();
+        }
       }
+    } catch {
+      push(mk({ kind: 'text', role: 'bot', text: '⚠️ เกิดข้อผิดพลาด กรุณาลองใหม่ค่ะ' }));
     }
 
     setSending(false);
@@ -194,7 +180,7 @@ function MessageBubble({ msg, onNavigate }: { msg: ChatMessage; onNavigate: () =
   }
 
   if (msg.kind === 'tx') {
-    return <TxCard tx={msg.transaction} usedTraining={msg.usedTraining} onNavigate={onNavigate} />;
+    return <TxCard tx={msg.transaction} usedTraining={msg.usedTraining} autoLearned={msg.autoLearned} onNavigate={onNavigate} />;
   }
 
   const isBot = msg.role === 'bot';
@@ -202,7 +188,9 @@ function MessageBubble({ msg, onNavigate }: { msg: ChatMessage; onNavigate: () =
     <div className={`flex gap-2 items-end ${isBot ? '' : 'flex-row-reverse'}`}>
       <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5"
         style={{ background: isBot ? 'var(--color-brand-dim)' : 'rgba(148,163,184,0.15)' }}>
-        {isBot ? <Bot size={14} style={{ color: 'var(--color-brand)' }} /> : <UserIcon size={14} style={{ color: 'var(--color-text-muted)' }} />}
+        {isBot
+          ? <Bot size={14} style={{ color: 'var(--color-brand)' }} />
+          : <UserIcon size={14} style={{ color: 'var(--color-text-muted)' }} />}
       </div>
       <div className="max-w-[75%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line"
         style={isBot
@@ -214,7 +202,7 @@ function MessageBubble({ msg, onNavigate }: { msg: ChatMessage; onNavigate: () =
   );
 }
 
-function TxCard({ tx, usedTraining, onNavigate }: { tx: Transaction; usedTraining: boolean; onNavigate: () => void }) {
+function TxCard({ tx, usedTraining, autoLearned, onNavigate }: { tx: Transaction; usedTraining: boolean; autoLearned: boolean; onNavigate: () => void }) {
   const isExpense = tx.type === 'EXPENSE';
   const typeColor = isExpense ? '#E91E8C' : '#16a34a';
   const typeBg = isExpense ? 'rgba(233,30,140,0.12)' : 'rgba(22,163,74,0.12)';
@@ -234,7 +222,6 @@ function TxCard({ tx, usedTraining, onNavigate }: { tx: Transaction; usedTrainin
 
         {/* Body */}
         <div className="px-4 py-3 space-y-2" style={{ background: 'rgba(15,23,42,0.95)' }}>
-          {/* Badge + category */}
           <div className="flex items-center gap-2">
             <span className="text-xs px-2.5 py-0.5 rounded-full font-bold" style={{ background: typeBg, color: typeColor }}>
               {isExpense ? 'รายจ่าย' : 'รายรับ'}
@@ -242,12 +229,10 @@ function TxCard({ tx, usedTraining, onNavigate }: { tx: Transaction; usedTrainin
             <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>- {tx.category}</span>
           </div>
 
-          {/* Date */}
           <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
             {new Date(tx.createdAt).toLocaleString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </p>
 
-          {/* Note + amount */}
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm" style={{ color: 'var(--color-text)' }}>{tx.note ?? tx.category}</span>
             <span className="text-base font-bold flex-shrink-0" style={{ color: typeColor }}>
@@ -255,7 +240,6 @@ function TxCard({ tx, usedTraining, onNavigate }: { tx: Transaction; usedTrainin
             </span>
           </div>
 
-          {/* Category + bar */}
           <div className="pt-1 border-t border-white/10">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{emoji} {tx.category}</span>
@@ -268,6 +252,9 @@ function TxCard({ tx, usedTraining, onNavigate }: { tx: Transaction; usedTrainin
 
           {usedTraining && (
             <p className="text-xs" style={{ color: 'var(--color-brand)' }}>⚡ ใช้ Training Case (ประหยัด token)</p>
+          )}
+          {autoLearned && (
+            <p className="text-xs" style={{ color: '#34d399' }}>🧠 เรียนรู้คำนี้แล้ว ครั้งหน้าจะเร็วขึ้นค่ะ</p>
           )}
         </div>
 

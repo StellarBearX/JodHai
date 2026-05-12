@@ -30,14 +30,19 @@ export class ChatController {
         );
       } catch (err: any) {
         if (err?.message === 'PARSE_FAILED') {
-          res.json({ reply: `ขอโทษนะ 😅 ไม่เข้าใจข้อความนี้ ลองพิมพ์ใหม่ เช่น "กาแฟ 65" หรือ "รับเงินเดือน 20000"` });
+          res.json({ question: 'ขอโทษนะคะ ไม่แน่ใจว่าหมายถึงอะไร ลองพิมพ์ใหม่ได้เลยค่ะ เช่น "กาแฟ 65" หรือ "รับเงินเดือน 20000" 😊' });
           return;
         }
         throw err;
       }
 
-      const { transaction: tx, usedTraining } = result;
-      res.json({ transaction: tx, usedTraining });
+      if (result.kind === 'question') {
+        res.json({ question: result.question });
+        return;
+      }
+
+      const { transaction, usedTraining, autoLearned } = result;
+      res.json({ transaction, usedTraining, autoLearned });
     } catch (err) {
       next(err);
     }
