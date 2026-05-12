@@ -1,0 +1,20 @@
+{
+  "name": "jod-hai",
+  "version": "1.0.0",
+  "description": "จดให้ — LINE-based expense tracking monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:liff\"",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:liff": "npm run dev --workspace=apps/liff",
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=apps/api && npm run build --workspace=apps/liff",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

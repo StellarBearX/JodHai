@@ -1,0 +1,50 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String        @id @default(uuid())
+  lineUserId   String        @unique @map("line_user_id")
+  displayName  String        @map("display_name")
+  budget       Float?
+  cycleStartDay Int          @default(1) @map("cycle_start_day")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  transactions Transaction[]
+
+  @@map("users")
+}
+
+// ─── Transaction ──────────────────────────────────────────────────────────────
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model Transaction {
+  id        String          @id @default(uuid())
+  userId    String          @map("user_id")
+  amount    Float
+  type      TransactionType
+  category  String
+  note      String?
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@map("transactions")
+}

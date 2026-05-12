@@ -1,0 +1,17 @@
+{
+  "name": "@jod-hai/shared",
+  "version": "1.0.0",
+  "description": "Shared TypeScript types and interfaces for Jod-Hai",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
