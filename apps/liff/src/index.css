@@ -1,0 +1,104 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base Reset ──────────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    --color-bg: #0f172a;
+    --color-surface: #1e293b;
+    --color-surface-2: #334155;
+    --color-brand: #22c55e;
+    --color-brand-dim: rgba(34, 197, 94, 0.15);
+    --color-income: #34d399;
+    --color-expense: #f87171;
+    --color-text: #f1f5f9;
+    --color-text-muted: #94a3b8;
+    --bottom-nav-height: 72px;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: 'Inter', 'Noto Sans Thai', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* ── Component Utilities ─────────────────────────────────────────────────── */
+@layer components {
+  /* Glass card effect */
+  .glass-card {
+    @apply rounded-2xl border border-white/10 backdrop-blur-md;
+    background: rgba(30, 41, 59, 0.7);
+  }
+
+  /* Gradient brand button */
+  .btn-brand {
+    @apply px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-95;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: white;
+    box-shadow: 0 4px 20px rgba(34, 197, 94, 0.35);
+  }
+  .btn-brand:hover {
+    box-shadow: 0 4px 28px rgba(34, 197, 94, 0.5);
+    transform: translateY(-1px);
+  }
+
+  /* Income / Expense badges */
+  .badge-income {
+    @apply text-xs font-semibold px-2.5 py-0.5 rounded-full;
+    color: var(--color-income);
+    background: rgba(52, 211, 153, 0.15);
+  }
+  .badge-expense {
+    @apply text-xs font-semibold px-2.5 py-0.5 rounded-full;
+    color: var(--color-expense);
+    background: rgba(248, 113, 113, 0.15);
+  }
+
+  /* Bottom navigation */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 flex items-center justify-around px-2;
+    height: var(--bottom-nav-height);
+    background: rgba(15, 23, 42, 0.9);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    z-index: 50;
+  }
+
+  .bottom-nav-item {
+    @apply flex flex-col items-center gap-0.5 text-xs font-medium transition-all duration-200 active:scale-90;
+    color: var(--color-text-muted);
+    min-width: 56px;
+    padding: 8px 4px;
+  }
+  .bottom-nav-item.active {
+    color: var(--color-brand);
+  }
+
+  /* Progress bar */
+  .progress-track {
+    @apply w-full rounded-full overflow-hidden;
+    height: 8px;
+    background: rgba(255,255,255,0.08);
+  }
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-700 ease-out;
+    background: linear-gradient(90deg, #22c55e, #86efac);
+  }
+  .progress-fill.danger {
+    background: linear-gradient(90deg, #ef4444, #fca5a5);
+  }
+}
