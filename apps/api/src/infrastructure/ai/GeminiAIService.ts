@@ -39,7 +39,7 @@ export class GeminiAIService {
     if (!this.client) return ruleBasedParse(rawMessage);
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = this.client.getGenerativeModel({ model: 'gemini-2.5-flash' });
       const result = await model.generateContent([SYSTEM_PROMPT, rawMessage]);
       const text = result.response.text().trim();
       const parsed = JSON.parse(text) as ParsedTransaction;
@@ -54,7 +54,7 @@ export class GeminiAIService {
   async parseTransactionFromImage(base64Data: string, mimeType: string): Promise<ParsedTransaction> {
     if (!this.client) throw new Error('PARSE_FAILED');
 
-    const model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = this.client.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await model.generateContent([
       SYSTEM_PROMPT,
       { inlineData: { data: base64Data, mimeType } },
