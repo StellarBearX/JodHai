@@ -1,52 +1,71 @@
 import { ITransactionRepository } from '../domain/repositories/ITransactionRepository';
 import { IUserRepository } from '../domain/repositories/IUserRepository';
+import { ITrainingCaseRepository } from '../domain/repositories/ITrainingCaseRepository';
 import { TransactionEntity } from '../domain/entities/TransactionEntity';
-import { ClaudeAIService, ParsedTransaction } from '../infrastructure/ai/ClaudeAIService';
+import { UserEntity } from '../domain/entities/UserEntity';
+import { GeminiAIService } from '../infrastructure/ai/GeminiAIService';
 
-/**
- * Use-Case: ProcessChatMessageUseCase
- *
- * Orchestrates the flow when a LINE user sends a chat message:
- * 1. Ensures the user exists in the DB (upsert).
- * 2. Sends the raw text to Claude for NLP parsing.
- * 3. Persists the resulting Transaction(s).
- * 4. Returns a human-readable reply string.
- */
+export interface ChatResult {
+  transaction: TransactionEntity;
+  user: UserEntity;
+  usedTraining: boolean;
+}
+
 export class ProcessChatMessageUseCase {
   constructor(
     private readonly userRepo: IUserRepository,
     private readonly transactionRepo: ITransactionRepository,
-    private readonly aiService: ClaudeAIService,
+    private readonly trainingCaseRepo: ITrainingCaseRepository,
+    private readonly aiService: GeminiAIService,
   ) {}
 
   async execute(
     lineUserId: string,
     displayName: string,
     rawMessage: string,
-  ): Promise<string> {
-    // 1. Ensure user record exists
+    imageBase64?: string,
+    imageMimeType?: string,
+  ): Promise<ChatResult> {
     const user = await this.userRepo.upsertByLineUserId(lineUserId, displayName);
 
-    // 2. Ask Claude to parse the message into structured data
-    let parsed: ParsedTransaction;
-    try {
-      parsed = await this.aiService.parseTransaction(rawMessage);
-    } catch {
-      return `ขอโทษนะ 😅 ไม่เข้าใจข้อความนี้ ลองพิมพ์ใหม่แบบ เช่น "กาแฟ 65" หรือ "รับเงินเดือน 20000"`;
+    // 1. Check training cases first (saves Gemini token)
+    if (!imageBase64) {
+      const trainingCases = await this.trainingCaseRepo.findAllByUserId(user.id);
+      const lower = rawMessage.toLowerCase();
+      const matched = trainingCases.find((tc) => lower.includes(tc.keyword.toLowerCase()));
+
+      if (matched) {
+        const amountMatch = rawMessage.match(/(\d[\d,]*\.?\d*)/);
+        const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null;
+        if (amount && amount > 0) {
+          const transaction = await this.transactionRepo.create({
+            userId: user.id,
+            amount,
+            type: matched.type,
+            category: matched.category,
+            note: rawMessage.replace(/\d[\d,]*\.?\d*/g, '').replace(/บาท|thb|฿/gi, '').trim() || undefined,
+          });
+          return { transaction, user, usedTraining: true };
+        }
+      }
     }
 
-    // 3. Persist
-    const tx = await this.transactionRepo.create({
-      userId: user.id,
-      amount: parsed.amount,
-      type: parsed.type,
-      category: parsed.category,
-      note: parsed.note,
-    });
+    // 2. Call Gemini (text or image)
+    try {
+      const parsed = imageBase64 && imageMimeType
+        ? await this.aiService.parseTransactionFromImage(imageBase64, imageMimeType)
+        : await this.aiService.parseTransaction(rawMessage);
 
-    // 4. Build reply
-    const emoji = tx.type === 'EXPENSE' ? '💸' : '💰';
-    const label = tx.type === 'EXPENSE' ? 'จ่าย' : 'รับ';
-    return `${emoji} บันทึกแล้ว!\n${label}: ${tx.amount.toLocaleString('th-TH')} บาท\nหมวด: ${tx.category}${tx.note ? `\nโน้ต: ${tx.note}` : ''}`;
+      const transaction = await this.transactionRepo.create({
+        userId: user.id,
+        amount: parsed.amount,
+        type: parsed.type,
+        category: parsed.category,
+        note: parsed.note,
+      });
+      return { transaction, user, usedTraining: false };
+    } catch {
+      throw new Error('PARSE_FAILED');
+    }
   }
 }

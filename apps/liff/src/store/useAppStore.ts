@@ -1,54 +1,53 @@
 import { create } from 'zustand';
-import type { DashboardSummary, Transaction, User } from '@jod-hai/shared';
+import type { DashboardSummary, Transaction, TrainingCase, User } from '@jod-hai/shared';
 import {
   fetchDashboardSummary,
   fetchTransactions,
   fetchUser,
   updateUserSettings,
   deleteTransaction,
-  DEV_LINE_USER_ID,
-  DEV_DISPLAY_NAME,
+  updateTransaction,
+  fetchTrainingCases,
+  upsertTrainingCase,
+  deleteTrainingCase,
 } from '../services/api';
 
-// ─── State Shape ──────────────────────────────────────────────────────────────
-
 interface AppState {
-  // ── Auth ──────────────────────────────────────────────────────────────────
   user: Pick<User, 'lineUserId' | 'displayName'> | null;
   userProfile: User | null;
-  isLiffReady: boolean;
+  isReady: boolean;
   setUser: (user: Pick<User, 'lineUserId' | 'displayName'> | null) => void;
-  setLiffReady: (ready: boolean) => void;
+  setReady: (ready: boolean) => void;
 
-  // ── Dashboard ─────────────────────────────────────────────────────────────
   dashboard: DashboardSummary | null;
   isLoadingDashboard: boolean;
   dashboardError: string | null;
   loadDashboard: () => Promise<void>;
 
-  // ── Transactions ──────────────────────────────────────────────────────────
   transactions: Transaction[];
   isLoadingTransactions: boolean;
   loadTransactions: () => Promise<void>;
+  editTransaction: (id: string, data: { amount?: number; type?: 'INCOME' | 'EXPENSE'; category?: string; note?: string }) => Promise<void>;
   removeTransaction: (id: string) => Promise<void>;
 
-  // ── User Settings ─────────────────────────────────────────────────────────
   loadUserProfile: () => Promise<void>;
   saveUserSettings: (settings: { budget?: number; cycleStartDay?: number }) => Promise<void>;
   isSavingSettings: boolean;
+
+  trainingCases: TrainingCase[];
+  isLoadingTrainingCases: boolean;
+  loadTrainingCases: () => Promise<void>;
+  saveTrainingCase: (tc: { keyword: string; category: string; type: 'INCOME' | 'EXPENSE' }) => Promise<void>;
+  removeTrainingCase: (id: string) => Promise<void>;
 }
 
-// ─── Store ────────────────────────────────────────────────────────────────────
-
 export const useAppStore = create<AppState>((set, get) => ({
-  // ── Auth ──────────────────────────────────────────────────────────────────
   user: null,
   userProfile: null,
-  isLiffReady: false,
+  isReady: false,
   setUser: (user) => set({ user }),
-  setLiffReady: (ready) => set({ isLiffReady: ready }),
+  setReady: (ready) => set({ isReady: ready }),
 
-  // ── Dashboard ─────────────────────────────────────────────────────────────
   dashboard: null,
   isLoadingDashboard: false,
   dashboardError: null,
@@ -58,21 +57,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ isLoadingDashboard: true, dashboardError: null });
     try {
       const data = await fetchDashboardSummary(user.lineUserId);
-      // Rehydrate Date objects from JSON strings
       data.recentTransactions = data.recentTransactions.map((tx) => ({
         ...tx,
         createdAt: new Date(tx.createdAt),
       }));
       set({ dashboard: data });
-    } catch (err) {
+    } catch {
       set({ dashboardError: 'ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่' });
-      console.error('[Store] loadDashboard:', err);
     } finally {
       set({ isLoadingDashboard: false });
     }
   },
 
-  // ── Transactions ──────────────────────────────────────────────────────────
   transactions: [],
   isLoadingTransactions: false,
   loadTransactions: async () => {
@@ -81,41 +77,37 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ isLoadingTransactions: true });
     try {
       const txs = await fetchTransactions(user.lineUserId);
-      set({
-        transactions: txs.map((tx) => ({ ...tx, createdAt: new Date(tx.createdAt) })),
-      });
-    } catch (err) {
-      console.error('[Store] loadTransactions:', err);
+      set({ transactions: txs.map((tx) => ({ ...tx, createdAt: new Date(tx.createdAt) })) });
     } finally {
       set({ isLoadingTransactions: false });
     }
   },
+  editTransaction: async (id, data) => {
+    const tx = await updateTransaction(id, data);
+    set((s) => ({
+      transactions: s.transactions.map((t) => t.id === id ? { ...tx, createdAt: new Date(tx.createdAt) } : t),
+    }));
+    get().loadDashboard();
+  },
   removeTransaction: async (id) => {
     const { user } = get();
     if (!user) return;
-    // Optimistic remove
     set((s) => ({ transactions: s.transactions.filter((tx) => tx.id !== id) }));
     try {
       await deleteTransaction(user.lineUserId, id);
-      // Refresh dashboard counts
       get().loadDashboard();
-    } catch (err) {
-      console.error('[Store] removeTransaction:', err);
-      // Rollback would reload from server
+    } catch {
       get().loadTransactions();
     }
   },
 
-  // ── User Settings ─────────────────────────────────────────────────────────
   loadUserProfile: async () => {
     const { user } = get();
     if (!user) return;
     try {
       const profile = await fetchUser(user.lineUserId);
       set({ userProfile: profile });
-    } catch (err) {
-      console.error('[Store] loadUserProfile:', err);
-    }
+    } catch {}
   },
   isSavingSettings: false,
   saveUserSettings: async (settings) => {
@@ -128,5 +120,38 @@ export const useAppStore = create<AppState>((set, get) => ({
     } finally {
       set({ isSavingSettings: false });
     }
+  },
+
+  trainingCases: [],
+  isLoadingTrainingCases: false,
+  loadTrainingCases: async () => {
+    const { user } = get();
+    if (!user) return;
+    set({ isLoadingTrainingCases: true });
+    try {
+      const cases = await fetchTrainingCases(user.lineUserId);
+      set({ trainingCases: cases.map((tc) => ({ ...tc, createdAt: new Date(tc.createdAt) })) });
+    } finally {
+      set({ isLoadingTrainingCases: false });
+    }
+  },
+  saveTrainingCase: async (tc) => {
+    const { user } = get();
+    if (!user) return;
+    const saved = await upsertTrainingCase(user.lineUserId, tc);
+    set((s) => {
+      const idx = s.trainingCases.findIndex((t) => t.keyword === saved.keyword);
+      const entry = { ...saved, createdAt: new Date(saved.createdAt) };
+      if (idx >= 0) {
+        const updated = [...s.trainingCases];
+        updated[idx] = entry;
+        return { trainingCases: updated };
+      }
+      return { trainingCases: [entry, ...s.trainingCases] };
+    });
+  },
+  removeTrainingCase: async (id) => {
+    set((s) => ({ trainingCases: s.trainingCases.filter((tc) => tc.id !== id) }));
+    await deleteTrainingCase(id);
   },
 }));

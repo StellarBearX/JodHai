@@ -21,9 +21,27 @@ model User {
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
 
-  transactions Transaction[]
+  transactions  Transaction[]
+  trainingCases TrainingCase[]
 
   @@map("users")
+}
+
+// ─── TrainingCase ──────────────────────────────────────────────────────────────
+
+model TrainingCase {
+  id        String          @id @default(uuid())
+  userId    String          @map("user_id")
+  keyword   String
+  category  String
+  type      TransactionType
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, keyword])
+  @@index([userId])
+  @@map("training_cases")
 }
 
 // ─── Transaction ──────────────────────────────────────────────────────────────

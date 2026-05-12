@@ -1,37 +1,24 @@
 import { Router } from 'express';
-import { middleware as lineMiddleware } from '@line/bot-sdk';
-import { WebhookController } from '../controllers/WebhookController';
 import { DashboardController } from '../controllers/DashboardController';
 import { ChatController } from '../controllers/ChatController';
 import { TransactionController } from '../controllers/TransactionController';
 import { UserController } from '../controllers/UserController';
+import { TrainingCaseController } from '../controllers/TrainingCaseController';
 
 export function createRouter(
-  webhookController: WebhookController,
   dashboardController: DashboardController,
   chatController: ChatController,
   transactionController: TransactionController,
   userController: UserController,
+  trainingCaseController: TrainingCaseController,
 ): Router {
   const router = Router();
 
-  // ── Health ────────────────────────────────────────────────────────────────
   router.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // ── LINE Webhook (production) ─────────────────────────────────────────────
-  // Only register if LINE keys are configured
-  const lineSecret = process.env.LINE_CHANNEL_SECRET;
-  if (lineSecret && lineSecret !== 'dev_placeholder') {
-    router.post(
-      '/webhook',
-      lineMiddleware({ channelSecret: lineSecret }),
-      (req, res, next) => webhookController.handleWebhook(req, res, next),
-    );
-  }
-
-  // ── Chat (dev-mode direct API) ────────────────────────────────────────────
+  // ── Chat ──────────────────────────────────────────────────────────────────
   router.post('/api/chat', (req, res, next) => chatController.handleChat(req, res, next));
 
   // ── Dashboard ─────────────────────────────────────────────────────────────
@@ -39,11 +26,17 @@ export function createRouter(
 
   // ── Transactions ──────────────────────────────────────────────────────────
   router.get('/api/transactions', (req, res, next) => transactionController.list(req, res, next));
+  router.put('/api/transactions/:id', (req, res, next) => transactionController.update(req, res, next));
   router.delete('/api/transactions/:id', (req, res, next) => transactionController.remove(req, res, next));
 
   // ── User / Settings ───────────────────────────────────────────────────────
   router.get('/api/user', (req, res, next) => userController.getUser(req, res, next));
   router.put('/api/user', (req, res, next) => userController.updateUser(req, res, next));
+
+  // ── Training Cases ────────────────────────────────────────────────────────
+  router.get('/api/training-cases', (req, res, next) => trainingCaseController.list(req, res, next));
+  router.post('/api/training-cases', (req, res, next) => trainingCaseController.upsert(req, res, next));
+  router.delete('/api/training-cases/:id', (req, res, next) => trainingCaseController.remove(req, res, next));
 
   return router;
 }

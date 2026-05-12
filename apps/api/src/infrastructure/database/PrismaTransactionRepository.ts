@@ -52,6 +52,11 @@ export class PrismaTransactionRepository implements ITransactionRepository {
     return this.toEntity(record);
   }
 
+  async updateById(id: string, data: Partial<{ amount: number; type: 'INCOME' | 'EXPENSE'; category: string; note: string }>): Promise<TransactionEntity> {
+    const record = await this.db.transaction.update({ where: { id }, data });
+    return this.toEntity(record);
+  }
+
   async deleteById(id: string): Promise<void> {
     await this.db.transaction.delete({ where: { id } });
   }
