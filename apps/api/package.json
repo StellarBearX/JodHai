@@ -14,6 +14,7 @@
     "@anthropic-ai/sdk": "^0.24.3",
     "@jod-hai/shared": "*",
     "@line/bot-sdk": "^9.3.0",
+    "@prisma/client": "^5.22.0",
     "@types/uuid": "^10.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
