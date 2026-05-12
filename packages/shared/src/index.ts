@@ -53,6 +53,17 @@ export interface Transaction {
 /** Payload used when creating a new Transaction (omit server-generated fields) */
 export type CreateTransactionDTO = Omit<Transaction, 'id' | 'createdAt'>;
 
+// ─── TrainingCase ─────────────────────────────────────────────────────────────
+
+export interface TrainingCase {
+  id: string;
+  userId: string;
+  keyword: string;
+  category: string;
+  type: TransactionType;
+  createdAt: Date;
+}
+
 /** Dashboard summary returned by the API */
 export interface DashboardSummary {
   totalIncome: number;

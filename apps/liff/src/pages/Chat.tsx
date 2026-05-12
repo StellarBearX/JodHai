@@ -1,208 +1,283 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, Bot, User as UserIcon, Lightbulb } from 'lucide-react';
+import { Send, Loader2, Bot, User as UserIcon, ImagePlus, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
-import { sendChatMessage } from '../services/api';
+import { sendChatMessage, sendChatImage } from '../services/api';
+import type { Transaction } from '@jod-hai/shared';
 
-interface Message {
+const CATEGORY_EMOJI: Record<string, string> = {
+  Food: '🍜', Transport: '🚗', Shopping: '🛍️', Health: '💊',
+  Entertainment: '🎬', Bills: '📄', Salary: '💰', Other: '📦',
+};
+
+const SUGGESTIONS = ['กาแฟ 65', 'ข้าวกลางวัน 120', 'รับเงินเดือน 25000', 'ค่าน้ำมัน 500', 'Netflix 299'];
+
+interface TextMessage {
   id: string;
+  kind: 'text';
   role: 'user' | 'bot';
   text: string;
   timestamp: Date;
 }
+interface ImageMessage {
+  id: string;
+  kind: 'image';
+  role: 'user';
+  preview: string;
+  timestamp: Date;
+}
+interface TxMessage {
+  id: string;
+  kind: 'tx';
+  role: 'bot';
+  transaction: Transaction;
+  usedTraining: boolean;
+  timestamp: Date;
+}
+type ChatMessage = TextMessage | ImageMessage | TxMessage;
 
-const SUGGESTIONS = [
-  'กาแฟ 65',
-  'ข้าวกลางวัน 120',
-  'รับเงินเดือน 25000',
-  'ค่าน้ำมัน 500',
-  'Netflix 299',
-  'Grab ไปทำงาน 180',
-];
-
-const WELCOME: Message = {
-  id: 'welcome',
-  role: 'bot',
-  text: 'สวัสดีครับ! 👋 ผมช่วยบันทึกรายรับ-รายจ่ายให้คุณได้เลย\nพิมพ์เช่น "กาแฟ 65" หรือ "รับเงินเดือน 25000" ได้เลย',
+const WELCOME: ChatMessage = {
+  id: 'welcome', kind: 'text', role: 'bot',
+  text: 'สวัสดีครับ! 👋 พิมพ์รายการ หรือส่งรูปสลิป/ใบเสร็จได้เลย',
   timestamp: new Date(),
 };
 
 export default function Chat() {
   const { user, loadDashboard, loadTransactions } = useAppStore();
-  const [messages, setMessages] = useState<Message[]>([WELCOME]);
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{ base64: string; mime: string; preview: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
-  // Auto-scroll on new message
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  const addMessage = useCallback((msg: Omit<Message, 'id' | 'timestamp'>) => {
-    setMessages((prev) => [
-      ...prev,
-      { ...msg, id: crypto.randomUUID(), timestamp: new Date() },
-    ]);
+  const addMessage = useCallback((msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
+    setMessages((prev) => [...prev, { ...msg, id: crypto.randomUUID(), timestamp: new Date() } as ChatMessage]);
   }, []);
 
+  const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const [header, base64] = dataUrl.split(',');
+      const mime = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg';
+      setImagePreview({ base64, mime, preview: dataUrl });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   const handleSend = async (text: string = input.trim()) => {
-    if (!text || sending || !user) return;
+    if ((!text && !imagePreview) || sending || !user) return;
     setInput('');
     setSending(true);
 
-    addMessage({ role: 'user', text });
-
-    try {
-      const reply = await sendChatMessage(user.lineUserId, user.displayName, text);
-      addMessage({ role: 'bot', text: reply });
-      // Refresh dashboard and transaction list in background
-      loadDashboard();
-      loadTransactions();
-    } catch {
-      addMessage({
-        role: 'bot',
-        text: '⚠️ เกิดข้อผิดพลาด กรุณาตรวจสอบว่า API server กำลังรันอยู่ (npm run dev:api)',
-      });
-    } finally {
-      setSending(false);
-      inputRef.current?.focus();
+    if (imagePreview) {
+      addMessage({ kind: 'image', role: 'user', preview: imagePreview.preview });
+      const img = imagePreview;
+      setImagePreview(null);
+      try {
+        const res = await sendChatImage(user.lineUserId, user.displayName, img.base64, img.mime);
+        addMessage({ kind: 'tx', role: 'bot', transaction: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, usedTraining: res.usedTraining });
+        loadDashboard(); loadTransactions();
+      } catch {
+        addMessage({ kind: 'text', role: 'bot', text: '⚠️ อ่านรูปไม่ได้ ลองใหม่อีกครั้ง' });
+      }
+    } else {
+      addMessage({ kind: 'text', role: 'user', text });
+      try {
+        const res = await sendChatMessage(user.lineUserId, user.displayName, text);
+        if (res.transaction) {
+          addMessage({ kind: 'tx', role: 'bot', transaction: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, usedTraining: res.usedTraining });
+          loadDashboard(); loadTransactions();
+        } else {
+          addMessage({ kind: 'text', role: 'bot', text: 'ขอโทษนะ ไม่เข้าใจข้อความนี้ ลองใหม่อีกครั้ง' });
+        }
+      } catch {
+        addMessage({ kind: 'text', role: 'bot', text: '⚠️ เกิดข้อผิดพลาด กรุณาลองใหม่' });
+      }
     }
-  };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+    setSending(false);
+    inputRef.current?.focus();
   };
 
   return (
-    <div className="flex flex-col h-full" style={{ paddingBottom: 0 }}>
-      {/* ── Header ── */}
-      <div
-        className="px-4 pt-6 pb-4 flex items-center gap-3 border-b border-white/10"
-        style={{ background: 'rgba(15,23,42,0.95)' }}
-      >
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'var(--color-brand-dim)' }}
-        >
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="px-4 pt-5 pb-3 flex items-center gap-3 border-b border-white/10" style={{ background: 'rgba(15,23,42,0.95)' }}>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--color-brand-dim)' }}>
           <Bot size={22} style={{ color: 'var(--color-brand)' }} />
         </div>
         <div>
-          <h1 className="text-base font-bold" style={{ color: 'var(--color-text)' }}>
-            จดให้ Bot
-          </h1>
-          <p className="text-xs" style={{ color: 'var(--color-brand)' }}>
-            ● ออนไลน์
-          </p>
+          <h1 className="text-base font-bold" style={{ color: 'var(--color-text)' }}>จดให้ AI</h1>
+          <p className="text-xs" style={{ color: 'var(--color-brand)' }}>● ออนไลน์ · Gemini Flash</p>
         </div>
       </div>
 
-      {/* ── Messages ── */}
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} msg={msg} />
-        ))}
+        {messages.map((msg) => <MessageBubble key={msg.id} msg={msg} onNavigate={() => navigate('/history')} />)}
         {sending && <TypingIndicator />}
         <div ref={bottomRef} />
       </div>
 
-      {/* ── Suggestions ── */}
-      <div className="px-4 pb-2">
-        <div className="flex gap-2 overflow-x-auto pb-1 snap-x">
-          {SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              onClick={() => handleSend(s)}
-              disabled={sending}
-              className="flex-shrink-0 snap-start text-xs px-3 py-1.5 rounded-full border border-white/15 transition-all active:scale-95 disabled:opacity-50"
-              style={{ color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.05)' }}
-            >
-              {s}
+      {/* Image preview */}
+      {imagePreview && (
+        <div className="px-4 pb-2 flex items-center gap-2">
+          <div className="relative">
+            <img src={imagePreview.preview} alt="preview" className="w-16 h-16 object-cover rounded-xl border border-white/20" />
+            <button onClick={() => setImagePreview(null)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: '#f87171' }}>
+              <X size={10} className="text-white" />
             </button>
-          ))}
+          </div>
+          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>กด ส่ง เพื่อให้ AI อ่านสลิป</p>
         </div>
-      </div>
+      )}
 
-      {/* ── Input Bar ── */}
-      <div
-        className="px-4 py-3 flex items-center gap-2 border-t border-white/10"
-        style={{ background: 'rgba(15,23,42,0.95)' }}
-      >
-        <div className="flex-1 relative">
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="พิมพ์รายการ เช่น ข้าว 60..."
-            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all"
-            style={{
-              background: 'rgba(255,255,255,0.07)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              color: 'var(--color-text)',
-            }}
-            disabled={sending}
-          />
+      {/* Suggestions */}
+      {messages.length <= 2 && (
+        <div className="px-4 pb-2">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {SUGGESTIONS.map((s) => (
+              <button key={s} onClick={() => handleSend(s)} disabled={sending}
+                className="flex-shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/15 transition-all active:scale-95 disabled:opacity-50"
+                style={{ color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.05)' }}>
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
-        <button
-          onClick={() => handleSend()}
-          disabled={!input.trim() || sending}
+      )}
+
+      {/* Input bar */}
+      <div className="px-4 py-3 flex items-center gap-2 border-t border-white/10" style={{ background: 'rgba(15,23,42,0.95)' }}>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImagePick} />
+        <button onClick={() => fileRef.current?.click()} disabled={sending}
           className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all active:scale-90 disabled:opacity-40"
-          style={{ background: 'var(--color-brand)' }}
-          aria-label="ส่ง"
-        >
-          {sending ? (
-            <Loader2 size={18} className="animate-spin text-white" />
-          ) : (
-            <Send size={18} className="text-white" />
-          )}
+          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)' }}>
+          <ImagePlus size={18} style={{ color: 'var(--color-text-muted)' }} />
+        </button>
+        <input ref={inputRef} type="text" value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          placeholder="พิมพ์รายการ หรืออัพโหลดรูปสลิป..."
+          className="flex-1 px-4 py-2.5 rounded-xl text-sm outline-none"
+          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--color-text)' }}
+          disabled={sending} />
+        <button onClick={() => handleSend()} disabled={(!input.trim() && !imagePreview) || sending}
+          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all active:scale-90 disabled:opacity-40"
+          style={{ background: 'var(--color-brand)' }}>
+          {sending ? <Loader2 size={18} className="animate-spin text-white" /> : <Send size={18} className="text-white" />}
         </button>
       </div>
     </div>
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+function MessageBubble({ msg, onNavigate }: { msg: ChatMessage; onNavigate: () => void }) {
+  if (msg.kind === 'image') {
+    return (
+      <div className="flex gap-2 items-end flex-row-reverse">
+        <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'rgba(148,163,184,0.15)' }}>
+          <UserIcon size={14} style={{ color: 'var(--color-text-muted)' }} />
+        </div>
+        <img src={msg.preview} alt="slip" className="max-w-[60%] rounded-2xl" style={{ borderBottomRightRadius: 4 }} />
+      </div>
+    );
+  }
 
-function MessageBubble({ msg }: { msg: Message }) {
+  if (msg.kind === 'tx') {
+    return <TxCard tx={msg.transaction} usedTraining={msg.usedTraining} onNavigate={onNavigate} />;
+  }
+
   const isBot = msg.role === 'bot';
   return (
     <div className={`flex gap-2 items-end ${isBot ? '' : 'flex-row-reverse'}`}>
-      {/* Avatar */}
-      <div
-        className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5"
-        style={{ background: isBot ? 'var(--color-brand-dim)' : 'rgba(148,163,184,0.15)' }}
-      >
-        {isBot ? (
-          <Bot size={14} style={{ color: 'var(--color-brand)' }} />
-        ) : (
-          <UserIcon size={14} style={{ color: 'var(--color-text-muted)' }} />
-        )}
+      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5"
+        style={{ background: isBot ? 'var(--color-brand-dim)' : 'rgba(148,163,184,0.15)' }}>
+        {isBot ? <Bot size={14} style={{ color: 'var(--color-brand)' }} /> : <UserIcon size={14} style={{ color: 'var(--color-text-muted)' }} />}
       </div>
-
-      {/* Bubble */}
-      <div
-        className="max-w-[75%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line"
-        style={
-          isBot
-            ? {
-                background: 'rgba(30,41,59,0.9)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: 'var(--color-text)',
-                borderBottomLeftRadius: 4,
-              }
-            : {
-                background: 'var(--color-brand)',
-                color: 'white',
-                borderBottomRightRadius: 4,
-              }
-        }
-      >
+      <div className="max-w-[75%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line"
+        style={isBot
+          ? { background: 'rgba(30,41,59,0.9)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--color-text)', borderBottomLeftRadius: 4 }
+          : { background: 'var(--color-brand)', color: 'white', borderBottomRightRadius: 4 }}>
         {msg.text}
+      </div>
+    </div>
+  );
+}
+
+function TxCard({ tx, usedTraining, onNavigate }: { tx: Transaction; usedTraining: boolean; onNavigate: () => void }) {
+  const isExpense = tx.type === 'EXPENSE';
+  const typeColor = isExpense ? '#E91E8C' : '#16a34a';
+  const typeBg = isExpense ? 'rgba(233,30,140,0.12)' : 'rgba(22,163,74,0.12)';
+  const emoji = CATEGORY_EMOJI[tx.category] ?? '📦';
+
+  return (
+    <div className="flex gap-2 items-end">
+      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5" style={{ background: 'var(--color-brand-dim)' }}>
+        <Bot size={14} style={{ color: 'var(--color-brand)' }} />
+      </div>
+      <div className="max-w-[85%] rounded-2xl overflow-hidden text-sm" style={{ borderBottomLeftRadius: 4, border: '1px solid rgba(255,255,255,0.1)' }}>
+        {/* Header */}
+        <div className="px-4 py-3" style={{ background: 'rgba(255,240,247,0.08)' }}>
+          <p className="font-bold text-base" style={{ color: 'var(--color-text)' }}>จดสำเร็จ ✅</p>
+          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>อย่าลืมตรวจสอบรายการด้วยนะคะ</p>
+        </div>
+
+        {/* Body */}
+        <div className="px-4 py-3 space-y-2" style={{ background: 'rgba(15,23,42,0.95)' }}>
+          {/* Badge + category */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold" style={{ background: typeBg, color: typeColor }}>
+              {isExpense ? 'รายจ่าย' : 'รายรับ'}
+            </span>
+            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>- {tx.category}</span>
+          </div>
+
+          {/* Date */}
+          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            {new Date(tx.createdAt).toLocaleString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          </p>
+
+          {/* Note + amount */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm" style={{ color: 'var(--color-text)' }}>{tx.note ?? tx.category}</span>
+            <span className="text-base font-bold flex-shrink-0" style={{ color: typeColor }}>
+              {isExpense ? '-' : '+'}฿{tx.amount.toLocaleString('th-TH')}
+            </span>
+          </div>
+
+          {/* Category + bar */}
+          <div className="pt-1 border-t border-white/10">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{emoji} {tx.category}</span>
+              <span className="text-xs font-bold" style={{ color: typeColor }}>฿{tx.amount.toLocaleString('th-TH')}</span>
+            </div>
+            <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+              <div className="h-1.5 rounded-full w-full" style={{ background: typeColor }} />
+            </div>
+          </div>
+
+          {usedTraining && (
+            <p className="text-xs" style={{ color: 'var(--color-brand)' }}>⚡ ใช้ Training Case (ประหยัด token)</p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: 'rgba(15,23,42,0.7)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>จัดหมวดไม่ถูก? แก้ได้ใน</p>
+          <button onClick={onNavigate} className="text-xs font-semibold" style={{ color: 'var(--color-brand)' }}>
+            ประวัติรายการ →
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -211,25 +286,12 @@ function MessageBubble({ msg }: { msg: Message }) {
 function TypingIndicator() {
   return (
     <div className="flex gap-2 items-end">
-      <div
-        className="w-7 h-7 rounded-full flex items-center justify-center"
-        style={{ background: 'var(--color-brand-dim)' }}
-      >
+      <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'var(--color-brand-dim)' }}>
         <Bot size={14} style={{ color: 'var(--color-brand)' }} />
       </div>
-      <div
-        className="px-4 py-3 rounded-2xl flex gap-1.5 items-center"
-        style={{ background: 'rgba(30,41,59,0.9)', border: '1px solid rgba(255,255,255,0.08)' }}
-      >
+      <div className="px-4 py-3 rounded-2xl flex gap-1.5 items-center" style={{ background: 'rgba(30,41,59,0.9)', border: '1px solid rgba(255,255,255,0.08)' }}>
         {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className="w-1.5 h-1.5 rounded-full"
-            style={{
-              background: 'var(--color-text-muted)',
-              animation: `bounce 1s ease-in-out ${i * 0.15}s infinite`,
-            }}
-          />
+          <span key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-text-muted)', animation: `bounce 1s ease-in-out ${i * 0.15}s infinite` }} />
         ))}
       </div>
     </div>

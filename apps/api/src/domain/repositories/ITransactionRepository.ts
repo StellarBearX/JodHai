@@ -26,6 +26,9 @@ export interface ITransactionRepository {
   /** Persist a new transaction */
   create(data: CreateTransactionDTO): Promise<TransactionEntity>;
 
+  /** Update a transaction by ID */
+  updateById(id: string, data: Partial<{ amount: number; type: 'INCOME' | 'EXPENSE'; category: string; note: string }>): Promise<TransactionEntity>;
+
   /** Remove a transaction by ID */
   deleteById(id: string): Promise<void>;
 }

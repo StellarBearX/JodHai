@@ -1,37 +1,43 @@
 import { Request, Response, NextFunction } from 'express';
 import { ProcessChatMessageUseCase } from '../../use-cases/ProcessChatMessageUseCase';
 
-/**
- * Presentation: Chat Controller
- * Handles the dev-mode chat endpoint that mimics the LINE webhook flow
- * but accepts JSON directly — no LINE signature required.
- *
- * POST /api/chat
- * Body: { lineUserId: string, displayName: string, message: string }
- */
 export class ChatController {
   constructor(private readonly processChatMessage: ProcessChatMessageUseCase) {}
 
   async handleChat(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { lineUserId, displayName, message } = req.body as {
+      const { lineUserId, displayName, message, imageBase64, imageMimeType } = req.body as {
         lineUserId?: string;
         displayName?: string;
         message?: string;
+        imageBase64?: string;
+        imageMimeType?: string;
       };
 
-      if (!lineUserId || !message) {
-        res.status(400).json({ error: 'lineUserId and message are required' });
+      if (!lineUserId || (!message && !imageBase64)) {
+        res.status(400).json({ error: 'lineUserId and message or imageBase64 are required' });
         return;
       }
 
-      const reply = await this.processChatMessage.execute(
-        lineUserId,
-        displayName ?? 'ผู้ใช้งาน',
-        message,
-      );
+      let result;
+      try {
+        result = await this.processChatMessage.execute(
+          lineUserId,
+          displayName ?? 'ผู้ใช้งาน',
+          message ?? '',
+          imageBase64,
+          imageMimeType,
+        );
+      } catch (err: any) {
+        if (err?.message === 'PARSE_FAILED') {
+          res.json({ reply: `ขอโทษนะ 😅 ไม่เข้าใจข้อความนี้ ลองพิมพ์ใหม่ เช่น "กาแฟ 65" หรือ "รับเงินเดือน 20000"` });
+          return;
+        }
+        throw err;
+      }
 
-      res.json({ reply });
+      const { transaction: tx, usedTraining } = result;
+      res.json({ transaction: tx, usedTraining });
     } catch (err) {
       next(err);
     }

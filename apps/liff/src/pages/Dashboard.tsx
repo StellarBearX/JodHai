@@ -8,6 +8,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import type { Transaction } from '@jod-hai/shared';
 
@@ -121,6 +122,7 @@ function getCategoryEmoji(category: string): string {
 
 export default function Dashboard() {
   const { user, dashboard, isLoadingDashboard, dashboardError, loadDashboard } = useAppStore();
+  const navigate = useNavigate();
 
   // Use mock data when user isn't authenticated (dev mode)
   const data = dashboard ?? MOCK_DASHBOARD;
@@ -217,6 +219,7 @@ export default function Dashboard() {
             รายการล่าสุด
           </h2>
           <button
+            onClick={() => navigate('/history')}
             className="flex items-center gap-0.5 text-xs font-medium"
             style={{ color: 'var(--color-brand)' }}
           >
