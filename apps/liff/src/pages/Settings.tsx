@@ -13,7 +13,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
 
 export default function Settings() {
   const {
-    user, userProfile, loadUserProfile, saveUserSettings, isSavingSettings, isReady, setReady,
+    user, userProfile, loadUserProfile, saveUserSettings, isSavingSettings,
     trainingCases, isLoadingTrainingCases, loadTrainingCases, saveTrainingCase, removeTrainingCase,
   } = useAppStore();
 
