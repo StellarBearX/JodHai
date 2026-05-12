@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { TransactionType } from '@jod-hai/shared';
 import { ruleBasedParse } from './RuleBasedParser';
+import { ConversationTurn } from '../conversation/ConversationStore';
 
 export interface ParsedTransaction {
   amount: number;
@@ -9,19 +10,31 @@ export interface ParsedTransaction {
   note?: string;
 }
 
-const SYSTEM_PROMPT = `You are an expense-tracking assistant for a Thai web app called Jod-Hai (จดให้).
-Parse the user's Thai or English message (or image of a receipt/slip) into a structured JSON object.
+export type ChatResponse =
+  | { complete: true; transaction: ParsedTransaction }
+  | { complete: false; question: string };
 
-Rules:
-- "amount" must be a positive number (THB).
-- "type" is "EXPENSE" for purchases/payments, "INCOME" for salary/received money.
-- "category" must be one of: Food, Transport, Shopping, Health, Entertainment, Bills, Salary, Other.
-- "note" is optional short description.
-- For images: extract the total amount paid and identify what kind of purchase it is.
-- Respond ONLY with valid JSON. No explanation, no markdown fences.
+const SYSTEM_PROMPT = `คุณคือ จดให้ (Jod-Hai) ผู้ช่วยบันทึกรายรับ-รายจ่ายใน app ภาษาไทย
+พูดจาเป็นกันเอง สั้น กระชับ น่ารัก
 
-Example output:
-{"amount": 65, "type": "EXPENSE", "category": "Food", "note": "ชานมไข่มุก"}`;
+เมื่อ user ส่งข้อความมา ให้วิเคราะห์แล้วตอบ ONLY valid JSON รูปแบบใดรูปแบบหนึ่ง:
+
+1. ถ้าข้อมูลครบ (มีจำนวนเงิน + รู้ว่าจ่ายหรือรับ):
+{"complete":true,"amount":120,"type":"EXPENSE","category":"Food","note":"กินข้าว"}
+
+2. ถ้าข้อมูลไม่ครบ ให้ถามกลับ 1 คำถามสั้นๆ เป็นธรรมชาติ:
+{"complete":false,"question":"จ่ายไปเท่าไหร่คะ? 🙏"}
+
+กฎ:
+- amount: ตัวเลขบวก (บาท)
+- type: "EXPENSE" = จ่ายเงิน/ซื้อของ, "INCOME" = รับเงิน/ได้เงิน
+- category: Food, Transport, Shopping, Health, Entertainment, Bills, Salary, Other
+- note: คำอธิบายสั้นๆ ใช้ภาษาเดิมที่ user พิมพ์
+- ห้ามผสม JSON กับข้อความ ตอบ JSON เท่านั้น`;
+
+const IMAGE_PROMPT = `วิเคราะห์ใบเสร็จ/สลิปในภาพนี้ แล้วตอบ JSON:
+{"complete":true,"amount":ยอดรวม,"type":"EXPENSE","category":"ประเภท","note":"รายละเอียด"}
+ถ้าอ่านยอดไม่ออกให้ตอบ: {"complete":false,"question":"อ่านยอดเงินในใบเสร็จไม่ชัดเลยค่ะ ช่วยพิมพ์ยอดมาได้ไหมคะ? 🙏"}`;
 
 export class GeminiAIService {
   private client: GoogleGenerativeAI | null;
@@ -29,42 +42,59 @@ export class GeminiAIService {
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
     this.client = apiKey ? new GoogleGenerativeAI(apiKey) : null;
-
     if (!this.client) {
-      console.info('[GeminiAIService] No API key — using rule-based parser fallback');
+      console.info('[GeminiAIService] No API key — rule-based fallback active');
     }
   }
 
-  async parseTransaction(rawMessage: string): Promise<ParsedTransaction> {
-    if (!this.client) return ruleBasedParse(rawMessage);
+  async chat(history: ConversationTurn[], newMessage: string): Promise<ChatResponse> {
+    if (!this.client) {
+      const tx = ruleBasedParse(newMessage);
+      return { complete: true, transaction: tx };
+    }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash-8b' });
-      const result = await model.generateContent([SYSTEM_PROMPT, rawMessage]);
-      const text = result.response.text().trim();
-      const parsed = JSON.parse(text) as ParsedTransaction;
-      if (!parsed.amount || !parsed.type || !parsed.category) throw new Error('missing fields');
-      return parsed;
+      const model = this.client.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        systemInstruction: SYSTEM_PROMPT,
+      });
+
+      const chatSession = model.startChat({ history });
+      const result = await chatSession.sendMessage(newMessage);
+      return this.parseResponse(result.response.text());
     } catch (err) {
-      console.warn('[GeminiAIService] text parse failed, falling back:', err);
-      return ruleBasedParse(rawMessage);
+      console.warn('[GeminiAIService] chat failed, rule-based fallback:', err);
+      const tx = ruleBasedParse(newMessage);
+      return { complete: true, transaction: tx };
     }
   }
 
-  async parseTransactionFromImage(base64Data: string, mimeType: string): Promise<ParsedTransaction> {
+  async parseFromImage(base64Data: string, mimeType: string): Promise<ChatResponse> {
     if (!this.client) throw new Error('PARSE_FAILED');
 
-    const model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash-8b' });
+    const model = this.client.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await model.generateContent([
-      SYSTEM_PROMPT,
+      IMAGE_PROMPT,
       { inlineData: { data: base64Data, mimeType } },
-      'Parse this receipt/slip image into a transaction JSON.',
     ]);
-    const text = result.response.text().trim();
-    // Strip markdown fences if Gemini adds them
-    const cleaned = text.replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim();
-    const parsed = JSON.parse(cleaned) as ParsedTransaction;
+    return this.parseResponse(result.response.text());
+  }
+
+  private parseResponse(raw: string): ChatResponse {
+    const cleaned = raw.trim().replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim();
+    const parsed = JSON.parse(cleaned);
+    if (parsed.complete === false && parsed.question) {
+      return { complete: false, question: parsed.question };
+    }
     if (!parsed.amount || !parsed.type || !parsed.category) throw new Error('missing fields');
-    return parsed;
+    return {
+      complete: true,
+      transaction: {
+        amount: parsed.amount,
+        type: parsed.type,
+        category: parsed.category,
+        note: parsed.note,
+      },
+    };
   }
 }

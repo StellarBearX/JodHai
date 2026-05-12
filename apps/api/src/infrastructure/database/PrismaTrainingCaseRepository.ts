@@ -10,7 +10,7 @@ export class PrismaTrainingCaseRepository implements ITrainingCaseRepository {
       where: { userId },
       orderBy: { createdAt: 'desc' },
     });
-    return rows.map((r) => new TrainingCaseEntity(r.id, r.userId, r.keyword, r.category, r.type, r.createdAt));
+    return rows.map((r: { id: string; userId: string; keyword: string; category: string; type: 'INCOME' | 'EXPENSE'; createdAt: Date }) => new TrainingCaseEntity(r.id, r.userId, r.keyword, r.category, r.type, r.createdAt));
   }
 
   async upsert(data: { userId: string; keyword: string; category: string; type: 'INCOME' | 'EXPENSE' }): Promise<TrainingCaseEntity> {

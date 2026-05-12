@@ -288,12 +288,16 @@ export class LineWebhookHandler {
 
       let replyMessages: messagingApi.Message[];
       try {
-        const { transaction, user } = await this.processChatMessage.execute(
+        const result = await this.processChatMessage.execute(
           lineUserId,
           profile.displayName,
           rawMessage,
         );
-        replyMessages = [buildFlexMessage(transaction, user)];
+        if (result.kind === 'question') {
+          replyMessages = [{ type: 'text', text: result.question } as messagingApi.Message];
+        } else {
+          replyMessages = [buildFlexMessage(result.transaction, result.user)];
+        }
       } catch (err: any) {
         if (err?.message === 'PARSE_FAILED') {
           replyMessages = [{

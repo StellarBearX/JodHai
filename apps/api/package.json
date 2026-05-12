@@ -13,7 +13,6 @@
     "db:reset": "prisma migrate reset --force && ts-node prisma/seed.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.24.3",
     "@google/generative-ai": "^0.24.1",
     "@jod-hai/shared": "*",
     "@line/bot-sdk": "^9.3.0",

@@ -12,9 +12,20 @@ export const DEV_DISPLAY_NAME = 'นักพัฒนา';
 
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 
-export interface ChatResponse {
+export interface ChatTransactionResponse {
   transaction: Transaction;
   usedTraining: boolean;
+  autoLearned: boolean;
+}
+
+export interface ChatQuestionResponse {
+  question: string;
+}
+
+export type ChatResponse = ChatTransactionResponse | ChatQuestionResponse;
+
+export function isChatQuestion(r: ChatResponse): r is ChatQuestionResponse {
+  return 'question' in r;
 }
 
 export async function sendChatMessage(
