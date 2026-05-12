@@ -55,8 +55,8 @@ export default function Chat() {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  const addMessage = useCallback((msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
-    setMessages((prev) => [...prev, { ...msg, id: crypto.randomUUID(), timestamp: new Date() } as ChatMessage]);
+  const addMessage = useCallback((msg: TextMessage | ImageMessage | TxMessage) => {
+    setMessages((prev) => [...prev, msg]);
   }, []);
 
   const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,29 +78,30 @@ export default function Chat() {
     setInput('');
     setSending(true);
 
+    const mk = () => ({ id: crypto.randomUUID(), timestamp: new Date() });
     if (imagePreview) {
-      addMessage({ kind: 'image', role: 'user', preview: imagePreview.preview });
+      addMessage({ ...mk(), kind: 'image', role: 'user', preview: imagePreview.preview });
       const img = imagePreview;
       setImagePreview(null);
       try {
         const res = await sendChatImage(user.lineUserId, user.displayName, img.base64, img.mime);
-        addMessage({ kind: 'tx', role: 'bot', transaction: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, usedTraining: res.usedTraining });
+        addMessage({ ...mk(), kind: 'tx', role: 'bot', transaction: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, usedTraining: res.usedTraining });
         loadDashboard(); loadTransactions();
       } catch {
-        addMessage({ kind: 'text', role: 'bot', text: '⚠️ อ่านรูปไม่ได้ ลองใหม่อีกครั้ง' });
+        addMessage({ ...mk(), kind: 'text', role: 'bot', text: '⚠️ อ่านรูปไม่ได้ ลองใหม่อีกครั้ง' });
       }
     } else {
-      addMessage({ kind: 'text', role: 'user', text });
+      addMessage({ ...mk(), kind: 'text', role: 'user', text });
       try {
         const res = await sendChatMessage(user.lineUserId, user.displayName, text);
         if (res.transaction) {
-          addMessage({ kind: 'tx', role: 'bot', transaction: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, usedTraining: res.usedTraining });
+          addMessage({ ...mk(), kind: 'tx', role: 'bot', transaction: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, usedTraining: res.usedTraining });
           loadDashboard(); loadTransactions();
         } else {
-          addMessage({ kind: 'text', role: 'bot', text: 'ขอโทษนะ ไม่เข้าใจข้อความนี้ ลองใหม่อีกครั้ง' });
+          addMessage({ ...mk(), kind: 'text', role: 'bot', text: 'ขอโทษนะ ไม่เข้าใจข้อความนี้ ลองใหม่อีกครั้ง' });
         }
       } catch {
-        addMessage({ kind: 'text', role: 'bot', text: '⚠️ เกิดข้อผิดพลาด กรุณาลองใหม่' });
+        addMessage({ ...mk(), kind: 'text', role: 'bot', text: '⚠️ เกิดข้อผิดพลาด กรุณาลองใหม่' });
       }
     }
 

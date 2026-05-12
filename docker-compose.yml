@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   # ─── PostgreSQL ────────────────────────────────────────────────────────────
   postgres:
@@ -20,21 +18,39 @@ services:
       timeout: 5s
       retries: 5
 
-  # ─── pgAdmin (optional DB GUI) ─────────────────────────────────────────────
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: jodhai_pgadmin
+  # ─── API ───────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: jodhai_api
     restart: unless-stopped
+    env_file:
+      - apps/api/.env
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@jodhai.local
-      PGADMIN_DEFAULT_PASSWORD: admin
+      DATABASE_URL: postgresql://jodhai:jodhai_secret@postgres:5432/jodhai
+      NODE_ENV: production
+      PORT: 3001
+      LIFF_ORIGIN: http://localhost:5173
     ports:
-      - '5050:80'
+      - '3001:3001'
     depends_on:
-      - postgres
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
+      postgres:
+        condition: service_healthy
+
+  # ─── Frontend ──────────────────────────────────────────────────────────────
+  liff:
+    build:
+      context: .
+      dockerfile: apps/liff/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3001
+    container_name: jodhai_liff
+    restart: unless-stopped
+    ports:
+      - '5173:80'
+    depends_on:
+      - api
 
 volumes:
   postgres_data:
-  pgadmin_data:
