@@ -1,5 +1,5 @@
 import { TransactionType } from '@jod-hai/shared';
-import { ParsedTransaction } from './ClaudeAIService';
+import { ParsedTransaction } from './GeminiAIService';
 
 /**
  * Rule-based Thai/English transaction parser.
