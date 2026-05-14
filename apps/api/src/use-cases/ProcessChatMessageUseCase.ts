@@ -8,7 +8,7 @@ import { GeminiAIService } from '../infrastructure/ai/GeminiAIService';
 import { conversationStore } from '../infrastructure/conversation/ConversationStore';
 
 export type UseCaseResult =
-  | { kind: 'transaction'; transaction: TransactionEntity; user: UserEntity; usedTraining: boolean; autoLearned: boolean }
+  | { kind: 'transaction'; transaction: TransactionEntity; user: UserEntity; usedTraining: boolean; autoLearned: boolean; message: string; emotion: string }
   | { kind: 'question'; question: string };
 
 export class ProcessChatMessageUseCase {
@@ -51,8 +51,9 @@ export class ProcessChatMessageUseCase {
             const note = rawMessage.replace(/\d[\d,]*\.?\d*/g, '').replace(/บาท|thb|฿/gi, '').trim() || undefined;
             const transaction = await this.transactionRepo.create({ userId: user.id, amount, type: matched.type, category: matched.category, note });
             conversationStore.clear(lineUserId);
+            const trainingMsg = `เรียบร้อยค่า! ⚡ จดให้รู้จัก "${matched.keyword}" แล้ว ไม่ต้องโทร AI เลย~`;
             await this.chatLogRepo.save({ userId: user.id, role: 'bot', kind: 'tx', content: JSON.stringify({ transaction: this.txToJson(transaction) }) });
-            return { kind: 'transaction', transaction, user, usedTraining: true, autoLearned: false };
+            return { kind: 'transaction', transaction, user, usedTraining: true, autoLearned: false, message: trainingMsg, emotion: 'happy' };
           }
         }
       }
@@ -66,7 +67,9 @@ export class ProcessChatMessageUseCase {
         response = await this.aiService.parseFromImage(imageBase64, imageMimeType);
       } else {
         const history = conversationStore.getHistory(lineUserId);
-        response = await this.aiService.chat(history, rawMessage);
+        // Pass budget context so Gemini can adjust tone
+        const budgetPct = undefined; // future: fetch from userRepo if needed
+        response = await this.aiService.chat(history, rawMessage, budgetPct);
         conversationStore.append(lineUserId, 'user', rawMessage);
       }
 
@@ -80,8 +83,10 @@ export class ProcessChatMessageUseCase {
       const tx = response.transaction;
       const transaction = await this.transactionRepo.create({ userId: user.id, amount: tx.amount, type: tx.type, category: tx.category, note: tx.note });
       const autoLearned = await this.tryAutoLearn(user.id, tx.note, tx.category, tx.type);
-      await this.chatLogRepo.save({ userId: user.id, role: 'bot', kind: 'tx', content: JSON.stringify({ transaction: this.txToJson(transaction), autoLearned }) });
-      return { kind: 'transaction', transaction, user, usedTraining: false, autoLearned };
+      const botMessage = response.complete ? response.message : 'เรียบร้อยค่า! ✅';
+      const emotion = response.complete ? response.emotion : 'happy';
+      await this.chatLogRepo.save({ userId: user.id, role: 'bot', kind: 'tx', content: JSON.stringify({ transaction: this.txToJson(transaction), autoLearned, message: botMessage }) });
+      return { kind: 'transaction', transaction, user, usedTraining: false, autoLearned, message: botMessage, emotion };
     } catch {
       conversationStore.clear(lineUserId);
       throw new Error('PARSE_FAILED');

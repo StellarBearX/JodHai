@@ -26,6 +26,8 @@ export interface ChatTransactionResponse {
   transaction: Transaction;
   usedTraining: boolean;
   autoLearned: boolean;
+  message: string;
+  emotion: 'happy' | 'excited' | 'neutral' | 'worried';
 }
 
 export interface ChatQuestionResponse {

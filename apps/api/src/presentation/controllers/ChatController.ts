@@ -6,13 +6,14 @@ export class ChatController {
 
   async handleChat(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { lineUserId, displayName, message, imageBase64, imageMimeType } = req.body as {
+      const { lineUserId, displayName, message: chatMessage, imageBase64, imageMimeType } = req.body as {
         lineUserId?: string;
         displayName?: string;
         message?: string;
         imageBase64?: string;
         imageMimeType?: string;
       };
+      const message = chatMessage;
 
       if (!lineUserId || (!message && !imageBase64)) {
         res.status(400).json({ error: 'lineUserId and message or imageBase64 are required' });
@@ -41,8 +42,8 @@ export class ChatController {
         return;
       }
 
-      const { transaction, usedTraining, autoLearned } = result;
-      res.json({ transaction, usedTraining, autoLearned });
+      const { transaction, usedTraining, autoLearned, message: botMsg, emotion } = result;
+      res.json({ transaction, usedTraining, autoLearned, message: botMsg, emotion });
     } catch (err) {
       next(err);
     }
