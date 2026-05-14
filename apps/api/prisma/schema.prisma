@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
@@ -14,18 +11,36 @@ datasource db {
 // ─── User ─────────────────────────────────────────────────────────────────────
 
 model User {
-  id           String        @id @default(uuid())
-  lineUserId   String        @unique @map("line_user_id")
-  displayName  String        @map("display_name")
-  budget       Float?
-  cycleStartDay Int          @default(1) @map("cycle_start_day")
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
+  id            String   @id @default(uuid())
+  lineUserId    String   @unique @map("line_user_id")
+  displayName   String   @unique @map("display_name")
+  pin           String?  // bcrypt hash of 4-digit PIN
+  budget        Float?
+  cycleStartDay Int      @default(1) @map("cycle_start_day")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   transactions  Transaction[]
   trainingCases TrainingCase[]
+  chatLogs      ChatLog[]
 
   @@map("users")
+}
+
+// ─── ChatLog ──────────────────────────────────────────────────────────────────
+
+model ChatLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  role      String   // "user" | "bot"
+  kind      String   // "text" | "tx" | "image"
+  content   String   // JSON
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("chat_logs")
 }
 
 // ─── TrainingCase ──────────────────────────────────────────────────────────────
