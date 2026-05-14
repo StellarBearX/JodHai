@@ -4,6 +4,7 @@ export interface User {
   displayName: string;
   budget?: number;
   cycleStartDay: number;
+  budgetPeriod: 'daily' | 'weekly' | 'monthly';
 }
 
 export type TransactionType = 'INCOME' | 'EXPENSE';
@@ -29,11 +30,17 @@ export interface TrainingCase {
   createdAt: Date;
 }
 
+export interface CategoryBudget {
+  category: string;
+  amount: number;
+}
+
 export interface DashboardSummary {
   totalIncome: number;
   totalExpense: number;
   balance: number;
   budgetUsedPercent: number;
+  byCategory: Record<string, number>;
   recentTransactions: Transaction[];
 }
 
