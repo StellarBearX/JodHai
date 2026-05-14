@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Save, Loader2, Wallet, CalendarDays, User, CheckCircle, Zap, Trash2, LogOut, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Save, Loader2, Wallet, CalendarDays, User, CheckCircle, Zap, Trash2, LogOut, Plus, ChevronRight, PiggyBank } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 
 const CYCLE_DAY_OPTIONS = [1, 5, 10, 15, 20, 25, 28];
@@ -24,6 +25,7 @@ function SectionCard({ icon, title, children }: { icon: React.ReactNode; title: 
 }
 
 export default function Settings() {
+  const navigate = useNavigate();
   const {
     user, userProfile, loadUserProfile, saveUserSettings, isSavingSettings,
     trainingCases, isLoadingTrainingCases, loadTrainingCases, saveTrainingCase, removeTrainingCase,
@@ -97,6 +99,21 @@ export default function Settings() {
           </p>
         </div>
       </div>
+
+      {/* ── Budget shortcut ── */}
+      <button
+        onClick={() => navigate('/budget')}
+        className="card w-full p-4 flex items-center gap-3 transition-all active:scale-[0.98] focus-visible:outline-none"
+      >
+        <div className="icon-wrap flex-shrink-0" style={{ background: 'var(--brand-dim)', color: 'var(--brand-dark)', borderRadius: '14px' }}>
+          <PiggyBank size={20} />
+        </div>
+        <div className="flex-1 text-left min-w-0">
+          <p className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>งบประมาณ</p>
+          <p className="text-xs" style={{ color: 'var(--text-3)' }}>ตั้งรอบงบและงบแต่ละหมวด</p>
+        </div>
+        <ChevronRight size={16} style={{ color: 'var(--text-3)' }} />
+      </button>
 
       {/* ── Budget ── */}
       <SectionCard icon={<Wallet size={14} />} title="งบประมาณต่อเดือน">
