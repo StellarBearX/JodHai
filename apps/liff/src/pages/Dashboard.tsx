@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { TrendingUp, TrendingDown, Wallet, ChevronRight, RefreshCw, AlertCircle, Sparkles, ArrowUpRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, RefreshCw, AlertCircle, Sparkles, ArrowUpRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
