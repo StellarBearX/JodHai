@@ -87,6 +87,7 @@ export class GeminiAIService {
   private geminiClient: GoogleGenerativeAI | null = null;
   private openaiClient: OpenAI | null = null;
   private openaiModel: string = 'gpt-4o';
+  private openaiVisionModel: string = 'gpt-4o';
 
   constructor() {
     this.provider = (process.env.AI_PROVIDER ?? 'gemini') as 'gemini' | 'openai';
@@ -95,9 +96,10 @@ export class GeminiAIService {
       const baseURL = process.env.OPENAI_BASE_URL;
       const apiKey  = process.env.OPENAI_API_KEY ?? 'none';
       this.openaiModel = process.env.OPENAI_MODEL ?? 'gpt-4o';
+      this.openaiVisionModel = process.env.OPENAI_VISION_MODEL ?? this.openaiModel;
       if (baseURL) {
         this.openaiClient = new OpenAI({ baseURL, apiKey });
-        console.info(`[AI] OpenAI-compatible → ${baseURL} (${this.openaiModel})`);
+        console.info(`[AI] OpenAI-compatible → ${baseURL} (text: ${this.openaiModel}, vision: ${this.openaiVisionModel})`);
       } else {
         console.warn('[AI] AI_PROVIDER=openai but OPENAI_BASE_URL not set — rule-based fallback');
         this.provider = 'none';
@@ -193,7 +195,7 @@ export class GeminiAIService {
   private async imageOpenAI(base64Data: string, mimeType: string): Promise<ChatResponse> {
     try {
       const res = await this.openaiClient!.chat.completions.create({
-        model: this.openaiModel,
+        model: this.openaiVisionModel,
         messages: [
           {
             role: 'user',
