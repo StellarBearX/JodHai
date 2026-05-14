@@ -10,7 +10,7 @@ export class UpdateUserSettingsUseCase {
 
   async execute(
     lineUserId: string,
-    settings: { budget?: number; cycleStartDay?: number },
+    settings: { budget?: number; cycleStartDay?: number; budgetPeriod?: string },
   ): Promise<User> {
     const user = await this.userRepo.findByLineUserId(lineUserId);
     if (!user) throw new Error(`User not found: ${lineUserId}`);
@@ -19,6 +19,7 @@ export class UpdateUserSettingsUseCase {
       user.id,
       settings.budget ?? user.budget ?? 0,
       settings.cycleStartDay ?? user.cycleStartDay,
+      settings.budgetPeriod ?? user.budgetPeriod,
     );
 
     return {
@@ -27,6 +28,7 @@ export class UpdateUserSettingsUseCase {
       displayName: updated.displayName,
       budget: updated.budget,
       cycleStartDay: updated.cycleStartDay,
+      budgetPeriod: updated.budgetPeriod as 'daily' | 'weekly' | 'monthly',
     };
   }
 }
