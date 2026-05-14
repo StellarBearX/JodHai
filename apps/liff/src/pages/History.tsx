@@ -28,7 +28,7 @@ function groupByDate(txs: Transaction[]): Map<string, Transaction[]> {
   return groups;
 }
 
-// ─── Edit bottom sheet ─────────────────────────────────────────────────────────
+// ─── Edit Modal (centered) ────────────────────────────────────────────────────
 interface EditPanelProps {
   tx: Transaction;
   onSave: (data: { amount?: number; type?: 'INCOME' | 'EXPENSE'; category?: string; note?: string }) => Promise<void>;
@@ -36,11 +36,19 @@ interface EditPanelProps {
   isSaving: boolean;
 }
 
+const CATEGORY_LABEL: Record<string, string> = {
+  Food: 'อาหาร', Transport: 'เดินทาง', Shopping: 'ช้อปปิ้ง', Health: 'สุขภาพ',
+  Entertainment: 'บันเทิง', Bills: 'ค่าใช้จ่าย', Salary: 'เงินเดือน', Other: 'อื่นๆ',
+};
+
 function EditPanel({ tx, onSave, onCancel, isSaving }: EditPanelProps) {
   const [amount, setAmount] = useState(String(tx.amount));
   const [type, setType] = useState<'INCOME' | 'EXPENSE'>(tx.type);
   const [category, setCategory] = useState(tx.category);
   const [note, setNote] = useState(tx.note ?? '');
+
+  const isExpense = type === 'EXPENSE';
+  const amountColor = isExpense ? 'var(--expense)' : 'var(--income)';
 
   const handleSave = async () => {
     const amountNum = parseFloat(amount);
@@ -49,112 +57,129 @@ function EditPanel({ tx, onSave, onCancel, isSaving }: EditPanelProps) {
   };
 
   return (
-    <div
-      className="sheet-overlay"
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      style={{ background: 'rgba(26,21,18,0.55)', backdropFilter: 'blur(6px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
       role="dialog"
       aria-modal="true"
       aria-label="แก้ไขรายการ"
     >
       <motion.div
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 30, stiffness: 320 }}
-        className="w-full max-w-lg flex flex-col"
+        initial={{ opacity: 0, scale: 0.92, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.94, y: 8 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+        className="w-full max-w-sm flex flex-col"
         style={{
           background: 'var(--surface)',
-          borderRadius: '24px 24px 0 0',
-          borderTop: '1px solid var(--border)',
-          boxShadow: 'var(--shadow-lg)',
-          maxHeight: `calc(92dvh - var(--bottom-nav-height))`,
+          borderRadius: '24px',
+          boxShadow: 'var(--shadow-lg), 0 0 0 1px var(--border)',
+          maxHeight: 'calc(100dvh - 48px)',
+          overflow: 'hidden',
         }}
       >
-        {/* ── Fixed top: handle + header ── */}
-        <div className="px-5 pt-5 pb-3 flex-shrink-0">
-          <div className="sheet-handle mb-4" />
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold" style={{ color: 'var(--text-1)' }}>แก้ไขรายการ</h2>
-            <button
-              onClick={onCancel}
-              className="icon-wrap-sm transition-colors focus-visible:outline-none"
-              style={{ background: 'var(--surface-2)', color: 'var(--text-3)' }}
-              aria-label="ปิด"
-            >
-              <X size={15} />
-            </button>
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 flex-shrink-0">
+          <div>
+            <h2 className="text-base font-extrabold" style={{ color: 'var(--text-1)' }}>แก้ไขรายการ</h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>
+              {CATEGORY_EMOJI[tx.category]} {tx.note || tx.category}
+            </p>
           </div>
+          <button
+            onClick={onCancel}
+            className="icon-wrap-sm transition-colors focus-visible:outline-none flex-shrink-0"
+            style={{ background: 'var(--surface-2)', color: 'var(--text-3)' }}
+            aria-label="ปิด"
+          >
+            <X size={15} />
+          </button>
         </div>
 
-        {/* ── Scrollable fields ── */}
-        <div className="flex-1 overflow-y-auto px-5 pb-2 space-y-3">
-          {/* Amount */}
-          <div className="space-y-1">
-            <label className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>จำนวนเงิน</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold" style={{ color: 'var(--text-3)' }}>฿</span>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                min={0}
-                className="input-field pl-8"
-                autoFocus
-              />
-            </div>
+        {/* ── Scrollable body ── */}
+        <div className="flex-1 overflow-y-auto px-5 space-y-5 pb-4 no-scrollbar">
+
+          {/* Amount — hero input */}
+          <div
+            className="rounded-2xl px-4 py-4 flex items-center gap-3"
+            style={{ background: isExpense ? 'var(--expense-bg)' : 'var(--income-bg)' }}
+          >
+            <span className="text-2xl font-black" style={{ color: amountColor }}>฿</span>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              min={0}
+              autoFocus
+              placeholder="0"
+              className="flex-1 bg-transparent outline-none text-2xl font-black min-w-0 focus-visible:outline-none"
+              style={{ color: amountColor }}
+              aria-label="จำนวนเงิน"
+            />
           </div>
 
           {/* Type toggle */}
-          <div className="space-y-1">
+          <div className="space-y-2">
             <p className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>ประเภท</p>
             <div
-              className="grid grid-cols-2 rounded-xl overflow-hidden p-1 gap-1"
-              style={{ background: 'var(--surface-2)', border: '1.5px solid var(--border)' }}
+              className="grid grid-cols-2 p-1 gap-1 rounded-xl"
+              style={{ background: 'var(--surface-2)' }}
               role="group"
               aria-label="ประเภทรายการ"
             >
-              <button
-                onClick={() => setType('EXPENSE')}
-                className="py-2.5 rounded-lg text-sm font-semibold transition-all focus-visible:outline-none"
-                style={{
-                  background: type === 'EXPENSE' ? 'var(--surface)' : 'transparent',
-                  color: type === 'EXPENSE' ? 'var(--expense)' : 'var(--text-3)',
-                  boxShadow: type === 'EXPENSE' ? 'var(--shadow-xs)' : 'none',
-                }}
-                aria-pressed={type === 'EXPENSE'}
-              >
-                รายจ่าย
-              </button>
-              <button
-                onClick={() => setType('INCOME')}
-                className="py-2.5 rounded-lg text-sm font-semibold transition-all focus-visible:outline-none"
-                style={{
-                  background: type === 'INCOME' ? 'var(--surface)' : 'transparent',
-                  color: type === 'INCOME' ? 'var(--income)' : 'var(--text-3)',
-                  boxShadow: type === 'INCOME' ? 'var(--shadow-xs)' : 'none',
-                }}
-                aria-pressed={type === 'INCOME'}
-              >
-                รายรับ
-              </button>
+              {([['EXPENSE', 'รายจ่าย', 'var(--expense)', 'var(--expense-bg)'], ['INCOME', 'รายรับ', 'var(--income)', 'var(--income-bg)']] as const).map(([val, label, color, bg]) => (
+                <button
+                  key={val}
+                  onClick={() => setType(val)}
+                  aria-pressed={type === val}
+                  className="py-2.5 rounded-lg text-sm font-bold transition-all active:scale-95 focus-visible:outline-none"
+                  style={{
+                    background: type === val ? bg : 'transparent',
+                    color: type === val ? color : 'var(--text-3)',
+                    boxShadow: type === val ? 'var(--shadow-xs)' : 'none',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Category */}
-          <div className="space-y-1">
-            <label htmlFor="edit-category" className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>หมวดหมู่</label>
-            <select
-              id="edit-category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="select-field"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>{CATEGORY_EMOJI[c]} {c}</option>
-              ))}
-            </select>
+          {/* Category grid */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>หมวดหมู่</p>
+            <div className="grid grid-cols-4 gap-2">
+              {CATEGORIES.map((c) => {
+                const isSelected = category === c;
+                return (
+                  <button
+                    key={c}
+                    onClick={() => setCategory(c)}
+                    aria-pressed={isSelected}
+                    className="flex flex-col items-center gap-1 py-2.5 rounded-xl transition-all active:scale-95 focus-visible:outline-none"
+                    style={{
+                      background: isSelected ? (isExpense ? 'var(--expense-bg)' : 'var(--income-bg)') : 'var(--surface-2)',
+                      border: isSelected ? `1.5px solid ${isExpense ? 'var(--expense-icon-bg)' : 'var(--income-icon-bg)'}` : '1.5px solid transparent',
+                      boxShadow: isSelected ? 'var(--shadow-xs)' : 'none',
+                    }}
+                  >
+                    <span className="text-lg leading-none">{CATEGORY_EMOJI[c]}</span>
+                    <span
+                      className="text-xs font-semibold leading-tight"
+                      style={{ color: isSelected ? (isExpense ? 'var(--expense)' : 'var(--income)') : 'var(--text-3)' }}
+                    >
+                      {CATEGORY_LABEL[c]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Note */}
-          <div className="space-y-1">
+          <div className="space-y-2">
             <label htmlFor="edit-note" className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>
               หมายเหตุ <span style={{ color: 'var(--text-4)' }}>(ไม่จำเป็น)</span>
             </label>
@@ -163,24 +188,24 @@ function EditPanel({ tx, onSave, onCancel, isSaving }: EditPanelProps) {
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="ระบุรายละเอียด..."
+              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+              placeholder="ระบุรายละเอียดเพิ่มเติม..."
               className="input-field"
             />
           </div>
         </div>
 
-        {/* ── Fixed action buttons at bottom ── */}
+        {/* ── Actions ── */}
         <div
-          className="flex gap-3 px-5 pt-3 pb-6 flex-shrink-0"
+          className="flex gap-3 px-5 pt-3 pb-5 flex-shrink-0"
           style={{ borderTop: '1px solid var(--border)' }}
         >
           <button onClick={onCancel} className="btn-ghost flex-1">
-            <X size={15} />
             ยกเลิก
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || !amount || parseFloat(amount) <= 0}
             className="btn-brand flex-1"
           >
             {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
@@ -188,7 +213,7 @@ function EditPanel({ tx, onSave, onCancel, isSaving }: EditPanelProps) {
           </button>
         </div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 }
 
