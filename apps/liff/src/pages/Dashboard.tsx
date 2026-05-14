@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { TrendingUp, TrendingDown, Wallet, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, ChevronRight, RefreshCw, AlertCircle, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
+import { fetchDashboardAnalysis } from '../services/api';
 import type { Transaction } from '@jod-hai/shared';
 import NongJodHai from '../components/Mascot/NongJodHai';
 
@@ -109,6 +110,8 @@ function TxRow({ tx }: { tx: Transaction }) {
 export default function Dashboard() {
   const { user, dashboard, isLoadingDashboard, dashboardError, loadDashboard } = useAppStore();
   const navigate = useNavigate();
+  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
   const data = dashboard ?? { totalIncome: 0, totalExpense: 0, balance: 0, budgetUsedPercent: 0, recentTransactions: [] };
   const pct = data.budgetUsedPercent;
@@ -120,6 +123,20 @@ export default function Dashboard() {
   const mascotState = isDanger ? 'warning' : 'idle';
 
   useEffect(() => { if (user) loadDashboard(); }, [user, loadDashboard]);
+
+  const loadAnalysis = async () => {
+    if (!user || loadingAnalysis) return;
+    setLoadingAnalysis(true);
+    setAnalysis(null);
+    try {
+      const result = await fetchDashboardAnalysis(user.lineUserId);
+      setAnalysis(result.analysis);
+    } catch {
+      setAnalysis('ขอโทษค่า ไม่สามารถวิเคราะห์ได้ในขณะนี้ ลองใหม่อีกทีนะคะ 😅');
+    } finally {
+      setLoadingAnalysis(false);
+    }
+  };
 
   return (
     <motion.div
@@ -237,6 +254,89 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* ── AI Analysis Card ── */}
+      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+        className="card overflow-hidden">
+        {/* Gradient header */}
+        <div className="px-4 py-3 flex items-center justify-between"
+          style={{ background: 'linear-gradient(135deg, #3ECFBF 0%, #28A99A 100%)' }}>
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-white" />
+            <h2 className="text-sm font-bold text-white">🤖 AI วิเคราะห์เดือนนี้</h2>
+          </div>
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={loadAnalysis}
+            disabled={loadingAnalysis}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all disabled:opacity-60"
+            style={{ background: 'rgba(255,255,255,0.22)', color: 'white', border: '1px solid rgba(255,255,255,0.35)' }}
+          >
+            {loadingAnalysis ? (
+              <>
+                <RefreshCw size={11} className="animate-spin" />
+                กำลังวิเคราะห์...
+              </>
+            ) : (
+              <>
+                <Sparkles size={11} />
+                วิเคราะห์เลย
+              </>
+            )}
+          </motion.button>
+        </div>
+
+        {/* Body */}
+        <div className="p-4">
+          <AnimatePresence mode="wait">
+            {!analysis && !loadingAnalysis && (
+              <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="text-center py-6 space-y-2">
+                <p className="text-2xl">🔍</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                  กดปุ่ม "วิเคราะห์เลย" เพื่อให้ AI สรุปการใช้เงินของเธอค่า
+                </p>
+              </motion.div>
+            )}
+
+            {loadingAnalysis && (
+              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="space-y-2.5 py-2">
+                {[1, 2, 3, 4].map((i) => (
+                  <SkeletonLine key={i} w={i % 2 === 0 ? 'w-4/5' : 'w-full'} h="h-3" />
+                ))}
+              </motion.div>
+            )}
+
+            {analysis && !loadingAnalysis && (
+              <motion.div key="result" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                className="space-y-2">
+                {analysis.split('\n').filter(Boolean).map((line, i) => (
+                  <motion.p
+                    key={i}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.06 }}
+                    className="text-sm leading-relaxed"
+                    style={{ color: 'var(--color-text)' }}
+                  >
+                    {line}
+                  </motion.p>
+                ))}
+                <div className="pt-2 flex justify-end">
+                  <button
+                    onClick={() => setAnalysis(null)}
+                    className="text-xs font-medium"
+                    style={{ color: 'var(--color-text-muted)' }}
+                  >
+                    ล้างผล ×
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
     </motion.div>
   );
 }

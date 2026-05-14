@@ -3,6 +3,8 @@ import OpenAI from 'openai';
 import { TransactionType } from '@jod-hai/shared';
 import { ruleBasedParse } from './RuleBasedParser';
 import { ConversationTurn } from '../conversation/ConversationStore';
+import { MonthlyStats } from '../../domain/repositories/ITransactionRepository';
+import { TransactionEntity } from '../../domain/entities/TransactionEntity';
 
 export interface ParsedTransaction {
   amount: number;
@@ -16,6 +18,13 @@ export type ChatResponse =
   | { complete: false; question: string };
 
 export type EmotionHint = 'happy' | 'excited' | 'neutral' | 'worried';
+
+export type EditDeleteResponse =
+  | { action: 'edit'; txId: string; changes: Partial<{ amount: number; category: string; note: string; type: 'INCOME' | 'EXPENSE' }>; message: string; emotion: EmotionHint }
+  | { action: 'delete'; txId: string; message: string; emotion: EmotionHint }
+  | { action: 'notfound'; message: string };
+
+export type QueryResponse = { answer: string; emotion: EmotionHint };
 
 const SYSTEM_PROMPT = `คุณคือ "น้องจดให้" (Nong Jod-Hai) — ผู้ช่วยส่วนตัวสาวน้อยสุดโปรที่คอยดูแลเรื่องเงินให้เพื่อนๆ
 
@@ -200,6 +209,118 @@ export class GeminiAIService {
       console.warn('[OpenAI] image parse failed:', (err as Error).message);
       return { complete: false, question: 'อ่านรูปไม่ได้เลยค่า 😅 ช่วยพิมพ์ยอดและรายละเอียดให้หน่อยได้ไหมคะ?' };
     }
+  }
+
+  // ── Financial Query ─────────────────────────────────────────────────────────
+  async answerQuery(stats: MonthlyStats, question: string): Promise<QueryResponse> {
+    const catLines = Object.entries(stats.byCategory).sort((a, b) => b[1] - a[1])
+      .map(([c, a]) => `  • ${c}: ฿${a.toLocaleString('th-TH')}`).join('\n');
+    const budgetPct = stats.totalIncome > 0 ? (stats.totalExpense / stats.totalIncome) * 100 : 0;
+
+    const prompt = `คุณคือ "น้องจดให้" ผู้ช่วยการเงินน่ารัก ใช้ภาษาไทยวัยรุ่น กระชับ ใส่ emoji
+
+ข้อมูลการเงินเดือนนี้:
+- รายรับรวม: ฿${stats.totalIncome.toLocaleString('th-TH')}
+- รายจ่ายรวม: ฿${stats.totalExpense.toLocaleString('th-TH')}
+- ยอดคงเหลือ: ฿${stats.balance.toLocaleString('th-TH')}
+- ใช้ไปแล้ว ${budgetPct.toFixed(1)}% ของรายรับ
+- จำนวนรายการ: ${stats.txCount} รายการ
+${catLines ? `รายจ่ายแยกหมวด:\n${catLines}` : ''}
+
+ผู้ใช้ถามว่า: "${question}"
+
+ตอบ JSON เท่านั้น:
+{"answer":"ข้อความตอบพร้อมตัวเลขจริง","emotion":"happy|neutral|worried|excited"}`;
+
+    try {
+      const raw = await this.callAI(prompt);
+      const p = JSON.parse(raw.trim().replace(/^```json?\n?/, '').replace(/\n?```$/, ''));
+      return { answer: p.answer ?? 'ขอโทษนะคะ ดึงข้อมูลไม่ได้ค่า', emotion: (p.emotion as EmotionHint) ?? 'neutral' };
+    } catch {
+      return { answer: `เดือนนี้รายรับ ฿${stats.totalIncome.toLocaleString('th-TH')} รายจ่าย ฿${stats.totalExpense.toLocaleString('th-TH')} คงเหลือ ฿${stats.balance.toLocaleString('th-TH')} จ้า 💚`, emotion: 'neutral' };
+    }
+  }
+
+  // ── Edit / Delete Intent ─────────────────────────────────────────────────────
+  async parseEditDeleteIntent(recentTxs: TransactionEntity[], message: string): Promise<EditDeleteResponse> {
+    const txList = recentTxs.map((t, i) =>
+      `${i + 1}. id="${t.id}" | ${t.type === 'EXPENSE' ? 'จ่าย' : 'รับ'} ฿${t.amount} | ${t.category} | ${t.note ?? '-'} | ${new Date(t.createdAt).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+    ).join('\n');
+
+    const prompt = `คุณคือ "น้องจดให้" ผู้ช่วยการเงิน
+
+รายการล่าสุดของผู้ใช้:
+${txList}
+
+ผู้ใช้พูดว่า: "${message}"
+
+วิเคราะห์ว่าต้องการแก้หรือลบรายการไหน แล้วตอบ JSON รูปแบบใดรูปแบบหนึ่ง:
+
+[แก้ไข]:
+{"action":"edit","txId":"id-ของรายการ","changes":{"amount":75},"message":"แก้เรียบร้อยค่า! ✏️ ...","emotion":"happy"}
+
+[ลบ]:
+{"action":"delete","txId":"id-ของรายการ","message":"ลบแล้วจ้า! 🗑️ ...","emotion":"neutral"}
+
+[หาไม่เจอ]:
+{"action":"notfound","message":"หารายการที่จะแก้ไม่เจอเลยค่า 😅 บอกรายละเอียดเพิ่มได้ไหมคะ?"}
+
+ตอบ JSON เท่านั้น`;
+
+    try {
+      const raw = await this.callAI(prompt);
+      const p = JSON.parse(raw.trim().replace(/^```json?\n?/, '').replace(/\n?```$/, ''));
+      if (p.action === 'edit') return { action: 'edit', txId: p.txId, changes: p.changes ?? {}, message: p.message ?? 'แก้เรียบร้อยแล้วจ้า! ✏️', emotion: p.emotion ?? 'happy' };
+      if (p.action === 'delete') return { action: 'delete', txId: p.txId, message: p.message ?? 'ลบแล้วจ้า! 🗑️', emotion: p.emotion ?? 'neutral' };
+      return { action: 'notfound', message: p.message ?? 'หาไม่เจอค่า ลองบอกรายละเอียดเพิ่มนะ 😅' };
+    } catch {
+      return { action: 'notfound', message: 'หารายการที่จะแก้ไม่เจอเลยค่า 😅 ลองบอกรายละเอียดเพิ่มได้ไหมคะ?' };
+    }
+  }
+
+  // ── Dashboard Analysis ───────────────────────────────────────────────────────
+  async analyzeDashboard(stats: MonthlyStats): Promise<string> {
+    if (stats.txCount === 0) return 'ยังไม่มีรายการเดือนนี้เลยค่า เริ่มจดได้เลยนะ! 💪';
+
+    const catLines = Object.entries(stats.byCategory).sort((a, b) => b[1] - a[1])
+      .map(([c, a]) => `${c}: ฿${a.toLocaleString('th-TH')}`).join(', ');
+    const budgetPct = stats.totalIncome > 0 ? (stats.totalExpense / stats.totalIncome) * 100 : 0;
+    const topCat = Object.entries(stats.byCategory).sort((a, b) => b[1] - a[1])[0];
+
+    const prompt = `คุณคือ "น้องจดให้" นักวิเคราะห์การเงินน่ารัก
+
+ข้อมูลเดือนนี้:
+- รายรับ: ฿${stats.totalIncome.toLocaleString('th-TH')} | รายจ่าย: ฿${stats.totalExpense.toLocaleString('th-TH')} | คงเหลือ: ฿${stats.balance.toLocaleString('th-TH')}
+- ใช้ไป ${budgetPct.toFixed(1)}% ของรายรับ | ${stats.txCount} รายการ
+- รายจ่ายแยกหมวด: ${catLines || 'ไม่มีรายจ่าย'}
+${topCat ? `- หมวดที่ใช้เงินมากสุด: ${topCat[0]} (฿${topCat[1].toLocaleString('th-TH')})` : ''}
+
+สรุปวิเคราะห์เดือนนี้เป็นภาษาไทยน่ารัก 3-4 bullet ประเด็น ใส่ emoji แต่ละข้อ กระชับ ข้อละ 1 ประโยค
+ตอบเป็น plain text (ไม่ใช่ JSON) ขึ้นต้นแต่ละบรรทัดด้วย • `;
+
+    try {
+      const raw = await this.callAI(prompt);
+      return raw.trim();
+    } catch {
+      return `• รายรับเดือนนี้ ฿${stats.totalIncome.toLocaleString('th-TH')} 💰\n• รายจ่ายรวม ฿${stats.totalExpense.toLocaleString('th-TH')} 💸\n• ยอดคงเหลือ ฿${stats.balance.toLocaleString('th-TH')} 🏦`;
+    }
+  }
+
+  // ── Internal AI caller ───────────────────────────────────────────────────────
+  private async callAI(prompt: string): Promise<string> {
+    if (this.provider === 'openai' && this.openaiClient) {
+      const res = await this.openaiClient.chat.completions.create({
+        model: this.openaiModel,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      return res.choices[0]?.message?.content ?? '';
+    }
+    if (this.provider === 'gemini' && this.geminiClient) {
+      const model = this.geminiClient.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    }
+    throw new Error('No AI provider');
   }
 
   // ── Shared parser ───────────────────────────────────────────────────────────

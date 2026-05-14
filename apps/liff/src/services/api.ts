@@ -8,12 +8,7 @@ const api = axios.create({
 });
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-
-export interface AuthResult {
-  lineUserId: string;
-  displayName: string;
-  isNew: boolean;
-}
+export interface AuthResult { lineUserId: string; displayName: string; isNew: boolean; }
 
 export async function authLogin(displayName: string, pin: string): Promise<AuthResult> {
   const { data } = await api.post<AuthResult>('/api/auth', { displayName, pin });
@@ -21,87 +16,82 @@ export async function authLogin(displayName: string, pin: string): Promise<AuthR
 }
 
 // ─── Chat ─────────────────────────────────────────────────────────────────────
-
 export interface ChatTransactionResponse {
-  transaction: Transaction;
-  usedTraining: boolean;
-  autoLearned: boolean;
-  message: string;
-  emotion: 'happy' | 'excited' | 'neutral' | 'worried';
+  transaction: Transaction; usedTraining: boolean; autoLearned: boolean;
+  message: string; emotion: 'happy' | 'excited' | 'neutral' | 'worried';
 }
+export interface ChatQuestionResponse  { question: string; }
+export interface ChatAnswerResponse    { answer: string; emotion: string; }
+export interface ChatEditedResponse    { edited: true; transaction: Transaction; message: string; emotion: string; }
+export interface ChatDeletedResponse   { deleted: true; message: string; emotion: string; }
 
-export interface ChatQuestionResponse {
-  question: string;
-}
+export type ChatResponse =
+  | ChatTransactionResponse
+  | ChatQuestionResponse
+  | ChatAnswerResponse
+  | ChatEditedResponse
+  | ChatDeletedResponse;
 
-export type ChatResponse = ChatTransactionResponse | ChatQuestionResponse;
-
-export function isChatQuestion(r: ChatResponse): r is ChatQuestionResponse {
-  return 'question' in r;
-}
+export function isChatQuestion(r: ChatResponse): r is ChatQuestionResponse  { return 'question' in r; }
+export function isChatAnswer(r: ChatResponse): r is ChatAnswerResponse       { return 'answer' in r; }
+export function isChatEdited(r: ChatResponse): r is ChatEditedResponse       { return 'edited' in r; }
+export function isChatDeleted(r: ChatResponse): r is ChatDeletedResponse     { return 'deleted' in r; }
 
 export async function sendChatMessage(lineUserId: string, displayName: string, message: string): Promise<ChatResponse> {
   const { data } = await api.post<ChatResponse>('/api/chat', { lineUserId, displayName, message });
   return data;
 }
-
 export async function sendChatImage(lineUserId: string, displayName: string, imageBase64: string, imageMimeType: string): Promise<ChatResponse> {
   const { data } = await api.post<ChatResponse>('/api/chat', { lineUserId, displayName, imageBase64, imageMimeType });
   return data;
 }
-
 export async function fetchChatHistory(lineUserId: string): Promise<ChatLogEntry[]> {
   const { data } = await api.get<ChatLogEntry[]>('/api/chat/history', { params: { lineUserId } });
   return data;
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
-
 export async function fetchDashboardSummary(lineUserId: string): Promise<DashboardSummary> {
   const { data } = await api.get<DashboardSummary>('/api/dashboard', { params: { lineUserId } });
   return data;
 }
+export async function fetchDashboardAnalysis(lineUserId: string): Promise<{ analysis: string }> {
+  const { data } = await api.get<{ analysis: string }>('/api/dashboard/analysis', { params: { lineUserId } });
+  return data;
+}
 
 // ─── Transactions ─────────────────────────────────────────────────────────────
-
 export async function fetchTransactions(lineUserId: string, options: { from?: string; to?: string; limit?: number } = {}): Promise<Transaction[]> {
   const { data } = await api.get<Transaction[]>('/api/transactions', { params: { lineUserId, ...options } });
   return data;
 }
-
 export async function updateTransaction(id: string, payload: { amount?: number; type?: 'INCOME' | 'EXPENSE'; category?: string; note?: string }): Promise<Transaction> {
   const { data } = await api.put<Transaction>(`/api/transactions/${id}`, payload);
   return data;
 }
-
 export async function deleteTransaction(lineUserId: string, txId: string): Promise<void> {
   await api.delete(`/api/transactions/${txId}`, { params: { lineUserId } });
 }
 
 // ─── User ─────────────────────────────────────────────────────────────────────
-
 export async function fetchUser(lineUserId: string): Promise<User> {
   const { data } = await api.get<User>('/api/user', { params: { lineUserId } });
   return data;
 }
-
 export async function updateUserSettings(lineUserId: string, settings: { budget?: number; cycleStartDay?: number }): Promise<User> {
   const { data } = await api.put<User>('/api/user', settings, { params: { lineUserId } });
   return data;
 }
 
 // ─── Training Cases ───────────────────────────────────────────────────────────
-
 export async function fetchTrainingCases(lineUserId: string): Promise<TrainingCase[]> {
   const { data } = await api.get<TrainingCase[]>('/api/training-cases', { params: { lineUserId } });
   return data;
 }
-
 export async function upsertTrainingCase(lineUserId: string, tc: { keyword: string; category: string; type: 'INCOME' | 'EXPENSE' }): Promise<TrainingCase> {
   const { data } = await api.post<TrainingCase>('/api/training-cases', tc, { params: { lineUserId } });
   return data;
 }
-
 export async function deleteTrainingCase(id: string): Promise<void> {
   await api.delete(`/api/training-cases/${id}`);
 }

@@ -295,6 +295,12 @@ export class LineWebhookHandler {
         );
         if (result.kind === 'question') {
           replyMessages = [{ type: 'text', text: result.question } as messagingApi.Message];
+        } else if (result.kind === 'answer') {
+          replyMessages = [{ type: 'text', text: result.answer } as messagingApi.Message];
+        } else if (result.kind === 'deleted') {
+          replyMessages = [{ type: 'text', text: result.message } as messagingApi.Message];
+        } else if (result.kind === 'edited') {
+          replyMessages = [{ type: 'text', text: result.message } as messagingApi.Message];
         } else {
           replyMessages = [buildFlexMessage(result.transaction, result.user)];
         }

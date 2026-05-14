@@ -3,7 +3,7 @@ import { Send, Loader2, ImagePlus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
-import { sendChatMessage, sendChatImage, isChatQuestion, fetchChatHistory } from '../services/api';
+import { sendChatMessage, sendChatImage, isChatQuestion, isChatAnswer, isChatEdited, isChatDeleted, fetchChatHistory } from '../services/api';
 import type { Transaction, ChatLogEntry } from '@jod-hai/shared';
 import { BotBubble, UserBubble, TypingBubble } from '../components/Chat/ChatBubble';
 import NongJodHai from '../components/Mascot/NongJodHai';
@@ -13,12 +13,15 @@ const CATEGORY_EMOJI: Record<string, string> = {
   Food: '🍜', Transport: '🚗', Shopping: '🛍️', Health: '💊',
   Entertainment: '🎬', Bills: '📄', Salary: '💰', Other: '📦',
 };
-const SUGGESTIONS = ['กาแฟ 65', 'ข้าวกลางวัน 120', 'รับเงินเดือน 25000', 'ค่าน้ำมัน 500', 'Netflix 299'];
+const SUGGESTIONS = ['กาแฟ 65', 'ข้าวกลางวัน 120', 'รับเงินเดือน 25000', 'เงินเหลือเท่าไหร่', 'ลบรายการล่าสุด', 'แก้รายการล่าสุด'];
 
-interface TextMsg  { id: string; kind: 'text';  role: 'user' | 'bot'; text: string; ts: Date; }
-interface ImageMsg { id: string; kind: 'image'; role: 'user'; preview: string; ts: Date; }
-interface TxMsg    { id: string; kind: 'tx';   role: 'bot'; tx: Transaction; usedTraining: boolean; autoLearned: boolean; message: string; emotion: string; ts: Date; }
-type Msg = TextMsg | ImageMsg | TxMsg;
+interface TextMsg    { id: string; kind: 'text';    role: 'user' | 'bot'; text: string; ts: Date; }
+interface ImageMsg   { id: string; kind: 'image';   role: 'user'; preview: string; ts: Date; }
+interface TxMsg      { id: string; kind: 'tx';      role: 'bot'; tx: Transaction; usedTraining: boolean; autoLearned: boolean; message: string; emotion: string; ts: Date; }
+interface AnswerMsg  { id: string; kind: 'answer';  role: 'bot'; answer: string; emotion: string; ts: Date; }
+interface EditedMsg  { id: string; kind: 'edited';  role: 'bot'; tx: Transaction; message: string; emotion: string; ts: Date; }
+interface DeletedMsg { id: string; kind: 'deleted'; role: 'bot'; message: string; emotion: string; ts: Date; }
+type Msg = TextMsg | ImageMsg | TxMsg | AnswerMsg | EditedMsg | DeletedMsg;
 
 const mk = <T extends object>(b: T): T & { id: string; ts: Date } => ({ ...b, id: crypto.randomUUID(), ts: new Date() });
 
@@ -91,6 +94,14 @@ export default function Chat() {
         const res = await sendChatImage(user.lineUserId, user.displayName, saved.base64, saved.mime);
         if (isChatQuestion(res)) {
           push(mk({ kind: 'text', role: 'bot', text: res.question }));
+        } else if (isChatAnswer(res)) {
+          push(mk({ kind: 'answer', role: 'bot', answer: res.answer, emotion: res.emotion }));
+        } else if (isChatEdited(res)) {
+          push(mk({ kind: 'edited', role: 'bot', tx: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, message: res.message, emotion: res.emotion }));
+          triggerSuccess(); loadDashboard(); loadTransactions();
+        } else if (isChatDeleted(res)) {
+          push(mk({ kind: 'deleted', role: 'bot', message: res.message, emotion: res.emotion }));
+          loadDashboard(); loadTransactions();
         } else {
           push(mk({ kind: 'tx', role: 'bot', tx: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, usedTraining: res.usedTraining, autoLearned: res.autoLearned, message: res.message, emotion: res.emotion }));
           triggerSuccess(); loadDashboard(); loadTransactions();
@@ -100,6 +111,14 @@ export default function Chat() {
         const res = await sendChatMessage(user.lineUserId, user.displayName, text);
         if (isChatQuestion(res)) {
           push(mk({ kind: 'text', role: 'bot', text: res.question }));
+        } else if (isChatAnswer(res)) {
+          push(mk({ kind: 'answer', role: 'bot', answer: res.answer, emotion: res.emotion }));
+        } else if (isChatEdited(res)) {
+          push(mk({ kind: 'edited', role: 'bot', tx: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, message: res.message, emotion: res.emotion }));
+          triggerSuccess(); loadDashboard(); loadTransactions();
+        } else if (isChatDeleted(res)) {
+          push(mk({ kind: 'deleted', role: 'bot', message: res.message, emotion: res.emotion }));
+          loadDashboard(); loadTransactions();
         } else {
           push(mk({ kind: 'tx', role: 'bot', tx: { ...res.transaction, createdAt: new Date(res.transaction.createdAt) }, usedTraining: res.usedTraining, autoLearned: res.autoLearned, message: res.message, emotion: res.emotion }));
           triggerSuccess(); loadDashboard(); loadTransactions();
@@ -237,7 +256,69 @@ function MsgBubble({ m, onNavigate }: { m: Msg; onNavigate: () => void }) {
 
   if (m.kind === 'tx') return <TxCard m={m} onNavigate={onNavigate} />;
 
+  if (m.kind === 'answer') return <BotBubble text={m.answer} />;
+
+  if (m.kind === 'deleted') return <BotBubble text={m.message} />;
+
+  if (m.kind === 'edited') return <EditedCard m={m} onNavigate={onNavigate} />;
+
   return m.role === 'bot' ? <BotBubble text={m.text} /> : <UserBubble text={m.text} />;
+}
+
+function EditedCard({ m, onNavigate }: { m: EditedMsg; onNavigate: () => void }) {
+  const { tx, message } = m;
+  const isExp = tx.type === 'EXPENSE';
+  const tc = isExp ? '#FF6B9D' : '#34C77B';
+  const tbg = isExp ? 'rgba(255,107,157,0.10)' : 'rgba(52,199,123,0.10)';
+  const emoji = CATEGORY_EMOJI[tx.category] ?? '📦';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', damping: 22, stiffness: 280 }}
+      className="flex gap-2 items-end"
+    >
+      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5 text-base">🤖</div>
+      <div className="max-w-[88%] overflow-hidden" style={{ borderRadius: 18, borderBottomLeftRadius: 6, border: '1.5px solid var(--color-border)', boxShadow: '0 4px 20px var(--color-shadow)', background: 'white' }}>
+        {/* Edited badge + Bot message */}
+        <div className="px-4 pt-3 pb-2 flex items-center gap-2 flex-wrap">
+          <span className="text-xs px-2 py-0.5 rounded-lg font-semibold" style={{ background: 'rgba(245,158,11,0.12)', color: '#B45309' }}>✏️ แก้ไขแล้ว</span>
+          <p className="text-sm leading-relaxed w-full" style={{ color: 'var(--color-text)' }}>{message}</p>
+        </div>
+
+        {/* Transaction card */}
+        <div className="mx-3 mb-3 rounded-2xl overflow-hidden" style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-border)' }}>
+          {/* Header strip */}
+          <div className="px-3 py-2 flex items-center justify-between" style={{ background: tbg }}>
+            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full" style={{ background: 'white', color: tc }}>
+              {isExp ? '↑ รายจ่าย' : '↓ รายรับ'}
+            </span>
+            <span className="text-sm font-black" style={{ color: tc }}>
+              {isExp ? '-' : '+'}฿{tx.amount.toLocaleString('th-TH')}
+            </span>
+          </div>
+
+          {/* Details */}
+          <div className="px-3 py-2.5 flex items-center gap-2.5">
+            <span className="text-2xl">{emoji}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold truncate" style={{ color: 'var(--color-text)' }}>{tx.note ?? tx.category}</p>
+              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                {tx.category} · {new Date(tx.createdAt).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 pb-3 flex justify-end">
+          <button onClick={onNavigate} className="text-xs font-semibold" style={{ color: 'var(--color-brand-dark)' }}>
+            ดูใน ประวัติ →
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
 }
 
 function TxCard({ m, onNavigate }: { m: TxMsg; onNavigate: () => void }) {

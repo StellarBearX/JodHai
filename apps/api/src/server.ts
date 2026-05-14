@@ -38,7 +38,7 @@ const deleteTransaction = new DeleteTransactionUseCase(userRepo, transactionRepo
 const updateUserSettings = new UpdateUserSettingsUseCase(userRepo);
 
 const authController = new AuthController(userRepo);
-const dashboardController = new DashboardController(getDashboardSummary);
+const dashboardController = new DashboardController(getDashboardSummary, userRepo, transactionRepo, aiService);
 const chatController = new ChatController(processChatMessage);
 const chatLogController = new ChatLogController(userRepo, chatLogRepo);
 const transactionController = new TransactionController(getTransactionList, deleteTransaction, transactionRepo);
