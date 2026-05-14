@@ -59,31 +59,33 @@ function EditPanel({ tx, onSave, onCancel, isSaving }: EditPanelProps) {
       <motion.div
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 320 }}
-        className="w-full max-w-lg"
+        className="w-full max-w-lg flex flex-col"
         style={{
           background: 'var(--surface)',
           borderRadius: '24px 24px 0 0',
           borderTop: '1px solid var(--border)',
           boxShadow: 'var(--shadow-lg)',
-          padding: '20px 20px 40px',
+          maxHeight: `calc(92dvh - var(--bottom-nav-height))`,
         }}
       >
-        <div className="sheet-handle mb-4" />
-
-        {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-bold" style={{ color: 'var(--text-1)' }}>แก้ไขรายการ</h2>
-          <button
-            onClick={onCancel}
-            className="icon-wrap-sm transition-colors focus-visible:outline-none"
-            style={{ background: 'var(--surface-2)', color: 'var(--text-3)' }}
-            aria-label="ปิด"
-          >
-            <X size={15} />
-          </button>
+        {/* ── Fixed top: handle + header ── */}
+        <div className="px-5 pt-5 pb-3 flex-shrink-0">
+          <div className="sheet-handle mb-4" />
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold" style={{ color: 'var(--text-1)' }}>แก้ไขรายการ</h2>
+            <button
+              onClick={onCancel}
+              className="icon-wrap-sm transition-colors focus-visible:outline-none"
+              style={{ background: 'var(--surface-2)', color: 'var(--text-3)' }}
+              aria-label="ปิด"
+            >
+              <X size={15} />
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-3">
+        {/* ── Scrollable fields ── */}
+        <div className="flex-1 overflow-y-auto px-5 pb-2 space-y-3">
           {/* Amount */}
           <div className="space-y-1">
             <label className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>จำนวนเงิน</label>
@@ -165,22 +167,25 @@ function EditPanel({ tx, onSave, onCancel, isSaving }: EditPanelProps) {
               className="input-field"
             />
           </div>
+        </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-2">
-            <button onClick={onCancel} className="btn-ghost flex-1">
-              <X size={15} />
-              ยกเลิก
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="btn-brand flex-1"
-            >
-              {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-              บันทึก
-            </button>
-          </div>
+        {/* ── Fixed action buttons at bottom ── */}
+        <div
+          className="flex gap-3 px-5 pt-3 pb-6 flex-shrink-0"
+          style={{ borderTop: '1px solid var(--border)' }}
+        >
+          <button onClick={onCancel} className="btn-ghost flex-1">
+            <X size={15} />
+            ยกเลิก
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="btn-brand flex-1"
+          >
+            {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+            บันทึก
+          </button>
         </div>
       </motion.div>
     </div>
