@@ -36,9 +36,9 @@ function useCountUp(target: number, duration = 1200) {
 
 // ── Dynamic BG ────────────────────────────────────────────────────────────────
 function getDynamicBg(pct: number): string {
-  if (pct >= 80) return 'linear-gradient(160deg, #FFF0F5 0%, #FFE4EE 100%)';
-  if (pct >= 50) return 'linear-gradient(160deg, #FFFBF0 0%, #FFF5D6 100%)';
-  return 'linear-gradient(160deg, #F0FFF8 0%, #E8FAF5 100%)';
+  if (pct >= 80) return 'linear-gradient(160deg, #F4F3EE 0%, #F0E8E4 100%)';
+  if (pct >= 50) return 'linear-gradient(160deg, #F4F3EE 0%, #EDE8E0 100%)';
+  return '#F4F3EE';
 }
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -61,23 +61,23 @@ function StatCard({ label, amount, variant, loading }: { label: string; amount: 
   const animated = useCountUp(amount);
   const isIncome = variant === 'income';
   const tc = isIncome ? 'var(--color-income)' : 'var(--color-expense)';
-  const bg = isIncome ? 'rgba(52,199,123,0.1)' : 'rgba(255,107,157,0.1)';
+  const iconBg = isIncome ? 'rgba(52,199,123,0.12)' : 'rgba(224,90,122,0.12)';
 
   if (loading) return (
-    <div className="card p-4 space-y-2">
+    <div className="card p-5 space-y-2.5">
       <SkeletonLine w="w-1/2" h="h-3" /><SkeletonLine w="w-3/4" h="h-6" />
     </div>
   );
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: isIncome ? 0.1 : 0.2 }}
-      className="card p-4 flex items-center gap-3">
-      <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: bg }}>
-        {isIncome ? <TrendingUp size={20} color={tc} /> : <TrendingDown size={20} color={tc} />}
+      className="card p-5 flex flex-col gap-3" style={{ background: '#FFFFFF' }}>
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: iconBg }}>
+        {isIncome ? <TrendingUp size={18} color={tc} /> : <TrendingDown size={18} color={tc} />}
       </div>
       <div>
-        <p className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
-        <p className="text-base font-black" style={{ color: tc }}>฿{animated.toLocaleString('th-TH')}</p>
+        <p className="text-xs font-medium mb-0.5" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
+        <p className="text-lg font-black leading-tight" style={{ color: tc }}>฿{animated.toLocaleString('th-TH')}</p>
       </div>
     </motion.div>
   );
@@ -140,23 +140,23 @@ export default function Dashboard() {
 
   return (
     <motion.div
-      className="min-h-full px-4 pt-5 pb-4 max-w-lg mx-auto space-y-4"
+      className="min-h-full px-4 pt-6 pb-6 max-w-lg mx-auto space-y-5"
       animate={{ background: getDynamicBg(pct) }}
       transition={{ duration: 1.2, ease: 'easeInOut' }}
     >
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <NongJodHai state={mascotState} size={48} />
+          <NongJodHai state={mascotState} size={44} />
           <div>
-            <p className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>สวัสดีค่า 👋</p>
-            <h1 className="text-lg font-black" style={{ color: 'var(--color-text)' }}>{user?.displayName ?? 'เพื่อน'}</h1>
+            <p className="text-xs font-medium tracking-wide" style={{ color: 'var(--color-text-muted)' }}>สวัสดีค่า 👋</p>
+            <h1 className="text-xl font-black leading-tight" style={{ color: 'var(--color-text)' }}>{user?.displayName ?? 'เพื่อน'}</h1>
           </div>
         </div>
         <motion.button whileTap={{ rotate: 360, scale: 0.9 }} transition={{ duration: 0.5 }}
           onClick={() => loadDashboard()} disabled={isLoadingDashboard}
           className="w-10 h-10 rounded-2xl card flex items-center justify-center transition-all">
-          <RefreshCw size={17} style={{ color: 'var(--color-text-muted)' }} className={isLoadingDashboard ? 'animate-spin' : ''} />
+          <RefreshCw size={16} style={{ color: 'var(--color-text-muted)' }} className={isLoadingDashboard ? 'animate-spin' : ''} />
         </motion.button>
       </div>
 
@@ -174,24 +174,25 @@ export default function Dashboard() {
       {/* ── Balance Card ── */}
       {isLoadingDashboard && !dashboard ? <SkeletonCard /> : (
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-          className="card p-5 relative overflow-hidden">
-          <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full pointer-events-none"
-            style={{ background: isDanger ? 'rgba(255,107,157,0.12)' : 'rgba(62,207,191,0.12)', filter: 'blur(20px)' }} />
+          className="card px-5 pt-6 pb-5 relative overflow-hidden" style={{ background: '#FFFFFF' }}>
+          {/* Decorative blob */}
+          <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full pointer-events-none"
+            style={{ background: isDanger ? 'rgba(224,90,122,0.10)' : 'rgba(193,95,60,0.10)', filter: 'blur(24px)' }} />
 
-          <p className="text-xs font-semibold mb-0.5" style={{ color: 'var(--color-text-muted)' }}>ยอดคงเหลือ</p>
+          <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--color-text-muted)' }}>ยอดคงเหลือ</p>
           <motion.p
             key={data.balance}
             initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-            className="text-4xl font-black tracking-tight"
+            className="text-5xl font-black tracking-tight mb-5"
             style={{ color: 'var(--color-text)' }}
           >
             ฿{balanceAnimated.toLocaleString('th-TH')}
           </motion.p>
 
-          <div className="mt-4 space-y-1.5">
-            <div className="flex justify-between text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
-              <span className="flex items-center gap-1"><Wallet size={12} /> งบประมาณเดือนนี้</span>
-              <span style={{ color: isDanger ? 'var(--color-expense)' : isWarn ? 'var(--color-warning)' : 'var(--color-brand-dark)', fontWeight: 700 }}>
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="flex items-center gap-1.5"><Wallet size={11} /> งบประมาณเดือนนี้</span>
+              <span style={{ color: isDanger ? 'var(--color-expense)' : isWarn ? 'var(--color-warning)' : 'var(--color-brand)', fontWeight: 700 }}>
                 {pct.toFixed(0)}%
               </span>
             </div>
@@ -203,7 +204,7 @@ export default function Dashboard() {
             <AnimatePresence>
               {isDanger && (
                 <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  className="text-xs font-semibold" style={{ color: 'var(--color-expense)' }}>
+                  className="text-xs font-semibold pt-0.5" style={{ color: 'var(--color-expense)' }}>
                   ⚠️ น้องจดให้เป็นห่วงนะ ใช้งบไปเยอะมากเลย!
                 </motion.p>
               )}
@@ -213,16 +214,19 @@ export default function Dashboard() {
       )}
 
       {/* ── Stats ── */}
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="รายรับ" amount={data.totalIncome} variant="income" loading={isLoadingDashboard && !dashboard} />
-        <StatCard label="รายจ่าย" amount={data.totalExpense} variant="expense" loading={isLoadingDashboard && !dashboard} />
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-widest mb-3 px-0.5" style={{ color: 'var(--color-text-muted)' }}>เดือนนี้</p>
+        <div className="grid grid-cols-2 gap-4">
+          <StatCard label="รายรับ" amount={data.totalIncome} variant="income" loading={isLoadingDashboard && !dashboard} />
+          <StatCard label="รายจ่าย" amount={data.totalExpense} variant="expense" loading={isLoadingDashboard && !dashboard} />
+        </div>
       </div>
 
       {/* ── Recent Transactions ── */}
-      <div className="card p-4">
-        <div className="flex items-center justify-between mb-2">
+      <div className="card px-5 pt-5 pb-4" style={{ background: '#FFFFFF' }}>
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>รายการล่าสุด</h2>
-          <button onClick={() => navigate('/history')} className="flex items-center gap-0.5 text-xs font-semibold" style={{ color: 'var(--color-brand-dark)' }}>
+          <button onClick={() => navigate('/history')} className="flex items-center gap-0.5 text-xs font-semibold transition-opacity hover:opacity-70" style={{ color: 'var(--color-brand)' }}>
             ดูทั้งหมด <ChevronRight size={13} />
           </button>
         </div>
@@ -257,20 +261,20 @@ export default function Dashboard() {
 
       {/* ── AI Analysis Card ── */}
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-        className="card overflow-hidden">
+        className="card overflow-hidden" style={{ background: '#FFFFFF' }}>
         {/* Gradient header */}
-        <div className="px-4 py-3 flex items-center justify-between"
-          style={{ background: 'linear-gradient(135deg, #3ECFBF 0%, #28A99A 100%)' }}>
+        <div className="px-5 py-4 flex items-center justify-between"
+          style={{ background: 'linear-gradient(135deg, #C15F3C 0%, #A34E30 100%)' }}>
           <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-white" />
-            <h2 className="text-sm font-bold text-white">🤖 AI วิเคราะห์เดือนนี้</h2>
+            <Sparkles size={15} className="text-white" />
+            <h2 className="text-sm font-bold text-white">AI วิเคราะห์เดือนนี้</h2>
           </div>
           <motion.button
             whileTap={{ scale: 0.92 }}
             onClick={loadAnalysis}
             disabled={loadingAnalysis}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all disabled:opacity-60"
-            style={{ background: 'rgba(255,255,255,0.22)', color: 'white', border: '1px solid rgba(255,255,255,0.35)' }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all disabled:opacity-60"
+            style={{ background: 'rgba(255,255,255,0.20)', color: 'white', border: '1px solid rgba(255,255,255,0.30)' }}
           >
             {loadingAnalysis ? (
               <>
@@ -287,11 +291,11 @@ export default function Dashboard() {
         </div>
 
         {/* Body */}
-        <div className="p-4">
+        <div className="px-5 py-4">
           <AnimatePresence mode="wait">
             {!analysis && !loadingAnalysis && (
               <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="text-center py-6 space-y-2">
+                className="text-center py-7 space-y-2">
                 <p className="text-2xl">🔍</p>
                 <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>
                   กดปุ่ม "วิเคราะห์เลย" เพื่อให้ AI สรุปการใช้เงินของเธอค่า
@@ -323,11 +327,11 @@ export default function Dashboard() {
                     {line}
                   </motion.p>
                 ))}
-                <div className="pt-2 flex justify-end">
+                <div className="pt-3 flex justify-end">
                   <button
                     onClick={() => setAnalysis(null)}
-                    className="text-xs font-medium"
-                    style={{ color: 'var(--color-text-muted)' }}
+                    className="text-xs font-semibold px-3 py-1 rounded-full transition-all"
+                    style={{ color: 'var(--color-brand)', background: 'var(--color-brand-dim)' }}
                   >
                     ล้างผล ×
                   </button>
