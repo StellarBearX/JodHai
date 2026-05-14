@@ -36,10 +36,14 @@ export class GetDashboardSummaryUseCase {
     const budget = user.budget ?? 0;
     const budgetUsedPercent = budget > 0 ? Math.min((totalExpense / budget) * 100, 100) : 0;
 
-    // Map to shared Transaction interface for serialization
+    const byCategory: Record<string, number> = {};
+    for (const tx of allTx) {
+      if (tx.type === 'EXPENSE') byCategory[tx.category] = (byCategory[tx.category] ?? 0) + tx.amount;
+    }
+
     const recentTransactions = recentTx.slice(0, 10).map(this.toShared);
 
-    return { totalIncome, totalExpense, balance, budgetUsedPercent, recentTransactions };
+    return { totalIncome, totalExpense, balance, budgetUsedPercent, byCategory, recentTransactions };
   }
 
   private getCycleRange(cycleStartDay: number): { from: Date; to: Date } {
