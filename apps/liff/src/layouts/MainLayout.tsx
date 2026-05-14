@@ -28,14 +28,14 @@ export default function MainLayout() {
               <motion.div
                 whileTap={{ scale: 0.85 }}
                 className="bottom-nav-item"
-                style={{ color: isActive ? 'var(--color-brand-dark)' : 'var(--color-text-muted)' }}
+                style={{ color: isActive ? 'var(--brand-dark)' : 'var(--text-3)' }}
               >
                 <div className="relative">
                   {isActive && (
                     <motion.div
                       layoutId="nav-pill"
                       className="absolute -inset-1.5 rounded-xl"
-                      style={{ background: 'var(--color-brand-dim)' }}
+                      style={{ background: 'var(--brand-dim)' }}
                       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                     />
                   )}
