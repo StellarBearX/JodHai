@@ -24,4 +24,4 @@ RUN npm run build --workspace=apps/api
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "cd apps/api && npx prisma migrate deploy && node dist/server.js"]
+CMD ["sh", "-c", "until cd apps/api && npx prisma db push --accept-data-loss 2>&1; do echo 'Waiting for DB...'; sleep 3; done && node dist/server.js"]
