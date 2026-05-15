@@ -1,9 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Delete, Loader2, ChevronLeft } from 'lucide-react';
 import { authLogin } from '../services/api';
 import NongJodHai from '../components/Mascot/NongJodHai';
-import { AVATARS, AVATAR_NAMES } from '../components/Avatar/avatars';
 
 const PAD = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
 
@@ -17,10 +16,6 @@ export default function Login({ onSuccess }: Props) {
   const [step, setStep] = useState<'name' | 'pin'>('name');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const avatarIdx = useMemo(() => Math.floor(Math.random() * AVATARS.length), []);
-  const AvatarComponent = AVATARS[avatarIdx];
-  const avatarName = AVATAR_NAMES[avatarIdx];
 
   const handleNameNext = () => {
     if (!name.trim()) return;
