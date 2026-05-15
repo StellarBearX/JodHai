@@ -81,7 +81,7 @@ export default function Budget() {
   };
 
   return (
-    <div className="flex flex-col min-h-full" style={{ background: 'var(--bg)' }}>
+    <div className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
 
       {/* ── Header ── */}
       <div
