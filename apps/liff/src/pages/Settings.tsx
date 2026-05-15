@@ -1,17 +1,32 @@
 import { useEffect, useState } from 'react';
-import { Save, Loader2, Wallet, CalendarDays, User, CheckCircle, Zap, Trash2, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Save, Loader2, Wallet, CalendarDays, CheckCircle, Zap, Trash2, LogOut, Plus, ChevronRight, PiggyBank } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { AVATARS } from '../components/Avatar/avatars';
 
 const CYCLE_DAY_OPTIONS = [1, 5, 10, 15, 20, 25, 28];
-
 const CATEGORIES = ['Food', 'Transport', 'Shopping', 'Health', 'Entertainment', 'Bills', 'Salary', 'Other'];
-
 const CATEGORY_EMOJI: Record<string, string> = {
   Food: '🍜', Transport: '🚗', Shopping: '🛍️', Health: '💊',
   Entertainment: '🎬', Bills: '📄', Salary: '💰', Other: '📦',
 };
 
+function SectionCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <div className="card">
+      <div className="flex items-center gap-2.5 px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div className="icon-wrap-sm" style={{ background: 'var(--brand-dim)', color: 'var(--brand-dark)' }}>
+          {icon}
+        </div>
+        <h2 className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>{title}</h2>
+      </div>
+      <div className="px-5 py-4">{children}</div>
+    </div>
+  );
+}
+
 export default function Settings() {
+  const navigate = useNavigate();
   const {
     user, userProfile, loadUserProfile, saveUserSettings, isSavingSettings,
     trainingCases, isLoadingTrainingCases, loadTrainingCases, saveTrainingCase, removeTrainingCase,
@@ -21,7 +36,6 @@ export default function Settings() {
   const [cycleStartDay, setCycleStartDay] = useState(1);
   const [saved, setSaved] = useState(false);
 
-  // Training case form state
   const [tcKeyword, setTcKeyword] = useState('');
   const [tcCategory, setTcCategory] = useState('Food');
   const [tcType, setTcType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
@@ -29,10 +43,7 @@ export default function Settings() {
   const [deletingTcId, setDeletingTcId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
-      loadUserProfile();
-      loadTrainingCases();
-    }
+    if (user) { loadUserProfile(); loadTrainingCases(); }
   }, [user, loadUserProfile, loadTrainingCases]);
 
   useEffect(() => {
@@ -53,22 +64,15 @@ export default function Settings() {
   const handleSaveTrainingCase = async () => {
     if (!tcKeyword.trim()) return;
     setIsSavingTc(true);
-    try {
-      await saveTrainingCase({ keyword: tcKeyword.trim(), category: tcCategory, type: tcType });
-      setTcKeyword('');
-    } finally {
-      setIsSavingTc(false);
-    }
+    try { await saveTrainingCase({ keyword: tcKeyword.trim(), category: tcCategory, type: tcType }); setTcKeyword(''); }
+    finally { setIsSavingTc(false); }
   };
 
   const handleDeleteTrainingCase = async (id: string) => {
     if (deletingTcId) return;
     setDeletingTcId(id);
-    try {
-      await removeTrainingCase(id);
-    } finally {
-      setDeletingTcId(null);
-    }
+    try { await removeTrainingCase(id); }
+    finally { setDeletingTcId(null); }
   };
 
   const handleLogout = () => {
@@ -77,285 +81,248 @@ export default function Settings() {
   };
 
   return (
-    <div className="px-4 pt-6 pb-6 max-w-lg mx-auto space-y-5">
+    <div className="px-4 pt-5 pb-8 max-w-lg mx-auto space-y-4" style={{ background: 'var(--bg)', minHeight: '100%' }}>
+
       {/* ── Header ── */}
-      <h1 className="text-xl font-bold" style={{ color: 'var(--color-text)' }}>
-        ตั้งค่า
-      </h1>
+      <h1 className="text-lg font-extrabold" style={{ color: 'var(--text-1)' }}>ตั้งค่า</h1>
 
       {/* ── Profile Card ── */}
-      <div className="glass-card p-4 flex items-center gap-3">
-        <div
-          className="w-12 h-12 rounded-2xl flex items-center justify-center"
-          style={{ background: 'var(--color-brand-dim)' }}
-        >
-          <User size={24} style={{ color: 'var(--color-brand)' }} />
-        </div>
-        <div>
-          <p className="text-base font-bold" style={{ color: 'var(--color-text)' }}>
+      <div className="card p-4 flex items-center gap-3">
+        {(() => {
+          const id = userProfile?.lineUserId ?? user?.lineUserId ?? '';
+          const idx = id.split('').reduce((s, c) => s + c.charCodeAt(0), 0) % AVATARS.length;
+          const AvatarComponent = AVATARS[idx];
+          return <AvatarComponent size={48} />;
+        })()}
+        <div className="min-w-0">
+          <p className="text-sm font-bold truncate" style={{ color: 'var(--text-1)' }}>
             {userProfile?.displayName ?? user?.displayName ?? '—'}
           </p>
-          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-xs truncate" style={{ color: 'var(--text-3)' }}>
             {userProfile?.lineUserId ?? user?.lineUserId ?? '—'}
           </p>
         </div>
       </div>
 
-      {/* ── Budget Setting ── */}
-      <div className="glass-card p-4 space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <Wallet size={16} style={{ color: 'var(--color-brand)' }} />
-          <span className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
-            งบประมาณต่อเดือน
-          </span>
+      {/* ── Budget shortcut ── */}
+      <button
+        onClick={() => navigate('/budget')}
+        className="card w-full p-4 flex items-center gap-3 transition-all active:scale-[0.98] focus-visible:outline-none"
+      >
+        <div className="icon-wrap flex-shrink-0" style={{ background: 'var(--brand-dim)', color: 'var(--brand-dark)', borderRadius: '14px' }}>
+          <PiggyBank size={20} />
         </div>
-        <div className="relative">
-          <span
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            ฿
-          </span>
-          <input
-            type="number"
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
-            placeholder="20000"
-            min={0}
-            className="w-full pl-7 pr-4 py-2.5 rounded-xl text-sm outline-none transition-all"
-            style={{
-              background: 'rgba(255,255,255,0.07)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              color: 'var(--color-text)',
-            }}
-          />
+        <div className="flex-1 text-left min-w-0">
+          <p className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>งบประมาณ</p>
+          <p className="text-xs" style={{ color: 'var(--text-3)' }}>ตั้งรอบงบและงบแต่ละหมวด</p>
         </div>
-        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          ใช้สำหรับคำนวณ % การใช้งบในหน้าหลัก
-        </p>
-      </div>
+        <ChevronRight size={16} style={{ color: 'var(--text-3)' }} />
+      </button>
+
+      {/* ── Budget ── */}
+      <SectionCard icon={<Wallet size={14} />} title="งบประมาณต่อเดือน">
+        <div className="space-y-2">
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold" style={{ color: 'var(--text-3)' }}>฿</span>
+            <input
+              type="number"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+              placeholder="20,000"
+              min={0}
+              className="input-field pl-8"
+              aria-label="งบประมาณต่อเดือน (บาท)"
+            />
+          </div>
+          <p className="text-xs" style={{ color: 'var(--text-3)' }}>
+            ใช้สำหรับคำนวณ % การใช้งบในหน้าหลัก
+          </p>
+        </div>
+      </SectionCard>
 
       {/* ── Cycle Start Day ── */}
-      <div className="glass-card p-4 space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <CalendarDays size={16} style={{ color: 'var(--color-brand)' }} />
-          <span className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
-            วันเริ่มรอบบัญชี
-          </span>
+      <SectionCard icon={<CalendarDays size={14} />} title="วันเริ่มรอบบัญชี">
+        <div className="space-y-3">
+          <div
+            className="grid grid-cols-7 gap-1.5"
+            role="group"
+            aria-label="เลือกวันเริ่มรอบบัญชี"
+          >
+            {CYCLE_DAY_OPTIONS.map((d) => (
+              <button
+                key={d}
+                onClick={() => setCycleStartDay(d)}
+                aria-pressed={cycleStartDay === d}
+                className="aspect-square rounded-lg text-sm font-bold transition-all active:scale-90 focus-visible:outline-none"
+                style={
+                  cycleStartDay === d
+                    ? { background: 'var(--brand-btn)', color: 'white', boxShadow: '0 2px 8px rgba(163,78,48,0.28)' }
+                    : { background: 'var(--surface-2)', color: 'var(--text-2)', border: '1.5px solid var(--border)' }
+                }
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs" style={{ color: 'var(--text-3)' }}>
+            รอบบัญชีจะเริ่มนับใหม่ทุกวันที่ <strong style={{ color: 'var(--text-2)' }}>{cycleStartDay}</strong> ของเดือน
+          </p>
         </div>
-        <div className="grid grid-cols-7 gap-1.5">
-          {CYCLE_DAY_OPTIONS.map((d) => (
-            <button
-              key={d}
-              onClick={() => setCycleStartDay(d)}
-              className="aspect-square rounded-xl text-sm font-semibold transition-all active:scale-90"
-              style={
-                cycleStartDay === d
-                  ? { background: 'var(--color-brand)', color: 'white' }
-                  : { background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-muted)' }
-              }
-            >
-              {d}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          รอบบัญชีจะเริ่มนับใหม่ทุกวันที่ {cycleStartDay} ของเดือน
-        </p>
-      </div>
+      </SectionCard>
 
-      {/* ── Save Button ── */}
+      {/* ── Save ── */}
       <button
         onClick={handleSave}
         disabled={isSavingSettings}
-        className="w-full btn-brand flex items-center justify-center gap-2 py-3"
+        className="btn-brand w-full"
       >
         {isSavingSettings ? (
-          <>
-            <Loader2 size={18} className="animate-spin" />
-            กำลังบันทึก...
-          </>
+          <><Loader2 size={16} className="animate-spin" />กำลังบันทึก...</>
         ) : saved ? (
-          <>
-            <CheckCircle size={18} />
-            บันทึกแล้ว!
-          </>
+          <><CheckCircle size={16} />บันทึกแล้ว</>
         ) : (
-          <>
-            <Save size={18} />
-            บันทึกการตั้งค่า
-          </>
+          <><Save size={16} />บันทึกการตั้งค่า</>
         )}
       </button>
 
-      {/* ── Training Cases Section ── */}
-      <div className="glass-card p-4 space-y-4">
-        {/* Header */}
-        <div className="flex items-start gap-2">
-          <Zap size={18} style={{ color: 'var(--color-brand)' }} className="mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
-              เทรน AI
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-              คำไหนให้จัดหมวดอะไร ไม่ต้องเรียก Gemini ทุกครั้ง ประหยัด token
-            </p>
-          </div>
-        </div>
-
-        {/* Add form */}
-        <div className="space-y-3">
-          <input
-            type="text"
-            value={tcKeyword}
-            onChange={(e) => setTcKeyword(e.target.value)}
-            placeholder="คีย์เวิร์ด เช่น ชานม, MRT, Netflix"
-            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all"
-            style={{
-              background: 'rgba(255,255,255,0.07)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              color: 'var(--color-text)',
-            }}
-          />
-
-          <div className="flex gap-2">
-            {/* Category select */}
-            <select
-              value={tcCategory}
-              onChange={(e) => setTcCategory(e.target.value)}
-              className="flex-1 px-3 py-2.5 rounded-xl text-sm outline-none transition-all"
-              style={{
-                background: 'rgba(255,255,255,0.07)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                color: 'var(--color-text)',
-              }}
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c} style={{ background: '#1e293b' }}>
-                  {CATEGORY_EMOJI[c]} {c}
-                </option>
-              ))}
-            </select>
-
-            {/* Type toggle */}
-            <div
-              className="flex rounded-xl overflow-hidden flex-shrink-0"
-              style={{ border: '1px solid rgba(255,255,255,0.12)' }}
-            >
-              <button
-                onClick={() => setTcType('EXPENSE')}
-                className="px-3 py-2 text-xs font-semibold transition-all"
-                style={{
-                  background: tcType === 'EXPENSE' ? 'rgba(248,113,113,0.25)' : 'rgba(255,255,255,0.05)',
-                  color: tcType === 'EXPENSE' ? 'var(--color-expense)' : 'var(--color-text-muted)',
-                }}
-              >
-                รายจ่าย
-              </button>
-              <button
-                onClick={() => setTcType('INCOME')}
-                className="px-3 py-2 text-xs font-semibold transition-all"
-                style={{
-                  background: tcType === 'INCOME' ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.05)',
-                  color: tcType === 'INCOME' ? 'var(--color-income)' : 'var(--color-text-muted)',
-                }}
-              >
-                รายรับ
-              </button>
-            </div>
-          </div>
-
-          <button
-            onClick={handleSaveTrainingCase}
-            disabled={isSavingTc || !tcKeyword.trim()}
-            className="w-full btn-brand flex items-center justify-center gap-2 py-2.5 text-sm disabled:opacity-50"
-          >
-            {isSavingTc ? (
-              <>
-                <Loader2 size={15} className="animate-spin" />
-                กำลังบันทึก...
-              </>
-            ) : (
-              <>
-                <Zap size={15} />
-                เพิ่ม Training Case
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* List */}
-        {isLoadingTrainingCases ? (
-          <div className="flex justify-center py-4">
-            <Loader2 size={20} className="animate-spin" style={{ color: 'var(--color-brand)' }} />
-          </div>
-        ) : trainingCases.length === 0 ? (
-          <p className="text-xs text-center py-2" style={{ color: 'var(--color-text-muted)' }}>
-            ยังไม่มี training cases
+      {/* ── Training Cases ── */}
+      <SectionCard icon={<Zap size={14} />} title="เทรน AI">
+        <div className="space-y-4">
+          <p className="text-xs" style={{ color: 'var(--text-3)' }}>
+            กำหนดว่าคำไหนควรจัดอยู่ในหมวดไหน ช่วยให้ AI จำแนกได้เร็วขึ้นโดยไม่ต้องเรียก Gemini ทุกครั้ง
           </p>
-        ) : (
-          <div className="space-y-2">
-            {trainingCases.map((tc) => (
-              <div
-                key={tc.id}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.04)' }}
-              >
-                {/* Keyword badge */}
-                <span
-                  className="text-xs font-mono px-2 py-0.5 rounded-lg flex-shrink-0"
-                  style={{ background: 'var(--color-brand-dim)', color: 'var(--color-brand)' }}
-                >
-                  {tc.keyword}
-                </span>
 
-                {/* Category */}
-                <span className="text-xs flex-1 truncate" style={{ color: 'var(--color-text-muted)' }}>
-                  {CATEGORY_EMOJI[tc.category] ?? '📦'} {tc.category}
-                </span>
+          {/* Add form */}
+          <div className="space-y-3 p-4 rounded-xl" style={{ background: 'var(--surface-2)', border: '1.5px solid var(--border)' }}>
+            <div className="space-y-1">
+              <label htmlFor="tc-keyword" className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>คีย์เวิร์ด</label>
+              <input
+                id="tc-keyword"
+                type="text"
+                value={tcKeyword}
+                onChange={(e) => setTcKeyword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveTrainingCase()}
+                placeholder="เช่น ชานม, MRT, Netflix"
+                className="input-field"
+                style={{ background: 'var(--surface)' }}
+              />
+            </div>
 
-                {/* Type badge */}
-                <span
-                  className="text-xs px-2 py-0.5 rounded-lg flex-shrink-0"
-                  style={{
-                    background: tc.type === 'INCOME' ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)',
-                    color: tc.type === 'INCOME' ? 'var(--color-income)' : 'var(--color-expense)',
-                  }}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label htmlFor="tc-category" className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>หมวดหมู่</label>
+                <select
+                  id="tc-category"
+                  value={tcCategory}
+                  onChange={(e) => setTcCategory(e.target.value)}
+                  className="select-field"
+                  style={{ background: 'var(--surface)' }}
                 >
-                  {tc.type === 'INCOME' ? 'รายรับ' : 'รายจ่าย'}
-                </span>
-
-                {/* Delete */}
-                <button
-                  onClick={() => handleDeleteTrainingCase(tc.id)}
-                  disabled={deletingTcId === tc.id}
-                  className="w-6 h-6 rounded-lg flex items-center justify-center transition-all active:scale-90 flex-shrink-0"
-                  style={{ background: 'rgba(248,113,113,0.15)', color: '#f87171' }}
-                  aria-label="ลบ"
-                >
-                  {deletingTcId === tc.id ? (
-                    <Loader2 size={11} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={11} />
-                  )}
-                </button>
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_EMOJI[c]} {c}</option>)}
+                </select>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* ── Logout Button ── */}
+              <div className="space-y-1">
+                <p className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>ประเภท</p>
+                <div
+                  className="grid grid-cols-2 rounded-xl p-0.5 gap-0.5"
+                  style={{ background: 'var(--surface-3)', border: '1.5px solid var(--border)' }}
+                  role="group"
+                >
+                  <button
+                    onClick={() => setTcType('EXPENSE')}
+                    aria-pressed={tcType === 'EXPENSE'}
+                    className="py-2 rounded-lg text-xs font-semibold transition-all focus-visible:outline-none"
+                    style={{
+                      background: tcType === 'EXPENSE' ? 'var(--surface)' : 'transparent',
+                      color: tcType === 'EXPENSE' ? 'var(--expense)' : 'var(--text-3)',
+                    }}
+                  >
+                    จ่าย
+                  </button>
+                  <button
+                    onClick={() => setTcType('INCOME')}
+                    aria-pressed={tcType === 'INCOME'}
+                    className="py-2 rounded-lg text-xs font-semibold transition-all focus-visible:outline-none"
+                    style={{
+                      background: tcType === 'INCOME' ? 'var(--surface)' : 'transparent',
+                      color: tcType === 'INCOME' ? 'var(--income)' : 'var(--text-3)',
+                    }}
+                  >
+                    รับ
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSaveTrainingCase}
+              disabled={isSavingTc || !tcKeyword.trim()}
+              className="btn-brand w-full text-sm"
+            >
+              {isSavingTc
+                ? <><Loader2 size={14} className="animate-spin" />กำลังบันทึก...</>
+                : <><Plus size={14} />เพิ่ม Training Case</>
+              }
+            </button>
+          </div>
+
+          {/* List */}
+          {isLoadingTrainingCases ? (
+            <div className="flex justify-center py-4">
+              <Loader2 size={18} className="animate-spin" style={{ color: 'var(--brand)' }} />
+            </div>
+          ) : trainingCases.length === 0 ? (
+            <p className="text-xs text-center py-2" style={{ color: 'var(--text-4)' }}>ยังไม่มี training cases</p>
+          ) : (
+            <div className="space-y-2">
+              {trainingCases.map((tc) => (
+                <div
+                  key={tc.id}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+                >
+                  <span
+                    className="text-xs font-mono font-bold px-2 py-0.5 rounded-md flex-shrink-0"
+                    style={{ background: 'var(--brand-dim)', color: 'var(--brand-on-dim)' }}
+                  >
+                    {tc.keyword}
+                  </span>
+                  <span className="text-xs flex-1 truncate" style={{ color: 'var(--text-3)' }}>
+                    {CATEGORY_EMOJI[tc.category] ?? '📦'} {tc.category}
+                  </span>
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-md font-semibold flex-shrink-0"
+                    style={{
+                      background: tc.type === 'INCOME' ? 'var(--income-bg)' : 'var(--expense-bg)',
+                      color: tc.type === 'INCOME' ? 'var(--income)' : 'var(--expense)',
+                    }}
+                  >
+                    {tc.type === 'INCOME' ? 'รายรับ' : 'รายจ่าย'}
+                  </span>
+                  <button
+                    onClick={() => handleDeleteTrainingCase(tc.id)}
+                    disabled={deletingTcId === tc.id}
+                    className="icon-wrap-sm flex-shrink-0 transition-colors focus-visible:outline-none disabled:opacity-50"
+                    style={{ background: 'var(--expense-bg)', color: 'var(--expense)' }}
+                    aria-label={`ลบ ${tc.keyword}`}
+                  >
+                    {deletingTcId === tc.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </SectionCard>
+
+      {/* ── Logout ── */}
       <button
         onClick={handleLogout}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all active:scale-95"
-        style={{
-          background: 'rgba(248,113,113,0.12)',
-          border: '1px solid rgba(248,113,113,0.2)',
-          color: '#f87171',
-        }}
+        className="btn-ghost w-full gap-2"
+        style={{ color: 'var(--expense)', borderColor: 'var(--expense-bg)', background: 'var(--expense-bg)' }}
       >
-        <LogOut size={16} />
+        <LogOut size={15} />
         ออกจากระบบ
       </button>
     </div>
