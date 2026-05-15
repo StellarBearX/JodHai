@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, Loader2, Wallet, CalendarDays, User, CheckCircle, Zap, Trash2, LogOut, Plus, ChevronRight, PiggyBank } from 'lucide-react';
+import { Save, Loader2, Wallet, CalendarDays, CheckCircle, Zap, Trash2, LogOut, Plus, ChevronRight, PiggyBank } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { AVATARS } from '../components/Avatar/avatars';
 
 const CYCLE_DAY_OPTIONS = [1, 5, 10, 15, 20, 25, 28];
 const CATEGORIES = ['Food', 'Transport', 'Shopping', 'Health', 'Entertainment', 'Bills', 'Salary', 'Other'];
@@ -87,9 +88,12 @@ export default function Settings() {
 
       {/* ── Profile Card ── */}
       <div className="card p-4 flex items-center gap-3">
-        <div className="icon-wrap" style={{ background: 'var(--brand-dim)', color: 'var(--brand-dark)', borderRadius: '14px' }}>
-          <User size={20} />
-        </div>
+        {(() => {
+          const id = userProfile?.lineUserId ?? user?.lineUserId ?? '';
+          const idx = id.split('').reduce((s, c) => s + c.charCodeAt(0), 0) % AVATARS.length;
+          const AvatarComponent = AVATARS[idx];
+          return <AvatarComponent size={48} />;
+        })()}
         <div className="min-w-0">
           <p className="text-sm font-bold truncate" style={{ color: 'var(--text-1)' }}>
             {userProfile?.displayName ?? user?.displayName ?? '—'}
