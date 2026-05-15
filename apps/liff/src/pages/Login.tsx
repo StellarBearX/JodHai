@@ -2,8 +2,6 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Delete, Loader2, ChevronLeft } from 'lucide-react';
 import { authLogin } from '../services/api';
-import NongJodHai from '../components/Mascot/NongJodHai';
-import type { MascotState } from '../components/Mascot/NongJodHai';
 import { AVATARS, AVATAR_NAMES } from '../components/Avatar/avatars';
 
 const PAD = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
@@ -18,7 +16,6 @@ export default function Login({ onSuccess }: Props) {
   const [step, setStep] = useState<'name' | 'pin'>('name');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [mascotState, setMascotState] = useState<MascotState>('idle');
 
   const avatarIdx = useMemo(() => Math.floor(Math.random() * AVATARS.length), []);
   const AvatarComponent = AVATARS[avatarIdx];
@@ -27,8 +24,6 @@ export default function Login({ onSuccess }: Props) {
   const handleNameNext = () => {
     if (!name.trim()) return;
     setPin(''); setError(''); setStep('pin');
-    setMascotState('writing');
-    setTimeout(() => setMascotState('idle'), 800);
   };
 
   const pressDigit = (d: string) => {
@@ -41,14 +36,10 @@ export default function Login({ onSuccess }: Props) {
 
   const submit = async (finalPin: string) => {
     setLoading(true); setError('');
-    setMascotState('writing');
     try {
       const r = await authLogin(name.trim(), finalPin);
-      setMascotState('success');
-      setTimeout(() => onSuccess(r.lineUserId, r.displayName), 500);
+      setTimeout(() => onSuccess(r.lineUserId, r.displayName), 300);
     } catch (err: any) {
-      setMascotState('warning');
-      setTimeout(() => setMascotState('idle'), 1500);
       setError(err?.response?.data?.error ?? 'เกิดข้อผิดพลาดค่า ลองใหม่นะ');
       setPin('');
     } finally {
@@ -206,7 +197,7 @@ export default function Login({ onSuccess }: Props) {
             </div>
 
             <button
-              onClick={() => { setStep('name'); setPin(''); setError(''); setMascotState('idle'); }}
+              onClick={() => { setStep('name'); setPin(''); setError(''); }}
               className="btn-ghost w-full gap-1.5"
             >
               <ChevronLeft size={15} />
