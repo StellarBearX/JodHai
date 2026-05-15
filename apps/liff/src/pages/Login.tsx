@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Delete, Loader2, ChevronLeft } from 'lucide-react';
 import { authLogin } from '../services/api';
 import NongJodHai from '../components/Mascot/NongJodHai';
 import type { MascotState } from '../components/Mascot/NongJodHai';
+import { AVATARS, AVATAR_NAMES } from '../components/Avatar/avatars';
 
 const PAD = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
 
@@ -18,6 +19,10 @@ export default function Login({ onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [mascotState, setMascotState] = useState<MascotState>('idle');
+
+  const avatarIdx = useMemo(() => Math.floor(Math.random() * AVATARS.length), []);
+  const AvatarComponent = AVATARS[avatarIdx];
+  const avatarName = AVATAR_NAMES[avatarIdx];
 
   const handleNameNext = () => {
     if (!name.trim()) return;
@@ -62,8 +67,19 @@ export default function Login({ onSuccess }: Props) {
         transition={{ duration: 0.45, ease: 'easeOut' }}
         className="text-center mb-8"
       >
-        <div className="flex justify-center mb-3">
-          <NongJodHai state={mascotState} size={96} />
+        <div className="flex justify-center mb-3 relative">
+          <motion.div
+            animate={{ y: [0, -5, 0] }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <AvatarComponent size={96} />
+          </motion.div>
+          <span
+            className="absolute -bottom-1 -right-1 text-xs font-bold px-2 py-0.5 rounded-full"
+            style={{ background: 'var(--brand-dim)', color: 'var(--brand-on-dim)', border: '1.5px solid var(--border)' }}
+          >
+            {avatarName}
+          </span>
         </div>
         <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: 'var(--text-1)' }}>จดให้</h1>
         <p className="text-sm mt-1 font-medium" style={{ color: 'var(--text-3)' }}>
