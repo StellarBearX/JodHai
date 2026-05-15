@@ -211,9 +211,11 @@ export class GeminiAIService {
           },
         ],
       });
-      return this.parseResponse(res.choices[0]?.message?.content ?? '');
+      const raw = res.choices[0]?.message?.content ?? '';
+      console.log('[Vision] raw response:', raw);
+      return this.parseResponse(raw);
     } catch (err) {
-      console.warn('[OpenAI] image parse failed:', (err as Error).message);
+      console.warn('[Vision] image parse failed:', (err as Error).message);
       return { complete: false, question: 'อ่านรูปไม่ได้เลยค่า 😅 ช่วยพิมพ์ยอดและรายละเอียดให้หน่อยได้ไหมคะ?' };
     }
   }
