@@ -33,6 +33,7 @@ export default function App() {
 
   const handleLoginSuccess = (lineUserId: string, displayName: string) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ lineUserId, displayName }));
+    window.history.replaceState({}, '', '/');
     setUser({ lineUserId, displayName });
     setNeedLogin(false);
   };
