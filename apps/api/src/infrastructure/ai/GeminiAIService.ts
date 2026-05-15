@@ -330,10 +330,11 @@ ${topCat ? `- หมวดที่ใช้เงินมากสุด: ${to
     const cleaned = raw.trim().replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim();
     const parsed = JSON.parse(cleaned);
     if (parsed.complete === false && parsed.question) return { complete: false, question: parsed.question };
-    if (!parsed.amount || !parsed.type || !parsed.category) throw new Error('missing fields');
+    const amount = Number(parsed.amount);
+    if (!amount || isNaN(amount) || !parsed.type || !parsed.category) throw new Error('missing fields');
     return {
       complete: true,
-      transaction: { amount: parsed.amount, type: parsed.type, category: parsed.category, note: parsed.note },
+      transaction: { amount, type: parsed.type, category: parsed.category, note: parsed.note },
       message: parsed.message ?? 'จดเรียบร้อยแล้วจ้า! ✅',
       emotion: (parsed.emotion as EmotionHint) ?? 'happy',
     };
