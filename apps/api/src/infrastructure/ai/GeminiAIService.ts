@@ -72,15 +72,22 @@ const SYSTEM_PROMPT = `คุณคือ "น้องจดให้" (Nong Jo
 - "โอ้โห! ช้อปหนักมากเลยนะวันนี้ 🛍️ จดไว้ก่อนน้า"
 - "จ่ายค่าน้ำมันแล้วจ้า ⛽ ขับรถระวังด้วยนะคะ"`;
 
-const IMAGE_PROMPT = `น้องจดให้กำลังดูรูปใบเสร็จ/สลิปโอนเงินนี้ วิเคราะห์แล้วตอบ JSON:
+const IMAGE_PROMPT = `คุณคือน้องจดให้ กำลังดูรูปใบเสร็จหรือสลิปโอนเงิน วิเคราะห์แล้วตอบ JSON เท่านั้น
 
-กฎการอ่าน note:
-- ถ้าเป็นสลิปโอนเงิน → note = ชื่อผู้รับเงิน (ชื่อบัญชีปลายทาง) เช่น "โอน นายสมชาย"
-- ถ้าเป็นใบเสร็จร้านค้า → note = ชื่อร้านหรือสินค้า เช่น "เสือป่าคอฟฟี่"
-- ถ้าไม่มีชื่อ → note = รายละเอียดกระชับจากสลิป
+กฎ category (เลือกหนึ่งอย่างเท่านั้น): Food | Transport | Shopping | Health | Entertainment | Bills | Other
+- สลิปโอนเงิน/PromptPay → Other
+- ร้านอาหาร/กาแฟ/เครื่องดื่ม → Food
+- ยา/คลินิก/โรงพยาบาล → Health
+- ห้างสรรพสินค้า/เสื้อผ้า → Shopping
+- BTS/MRT/น้ำมัน/Grab → Transport
+- ค่าไฟ/น้ำ/เน็ต → Bills
+
+กฎ note:
+- สลิปโอนเงิน → ชื่อผู้รับเงิน (ชื่อบัญชีปลายทาง)
+- ใบเสร็จร้านค้า → ชื่อร้าน
 
 [ถ้าอ่านยอดได้]:
-{"complete":true,"amount":ยอดรวม,"type":"EXPENSE","category":"หมวด","note":"ชื่อผู้รับหรือร้านค้า","message":"ข้อความน่ารักจากน้องจดให้","emotion":"happy"}
+{"complete":true,"amount":ยอดตัวเลข,"type":"EXPENSE","category":"หมวดจากลิสต์ด้านบน","note":"ชื่อผู้รับหรือร้านค้า","message":"ข้อความน่ารักสั้นๆ","emotion":"happy"}
 
 [ถ้าอ่านยอดไม่ได้]:
 {"complete":false,"question":"อ่านตัวเลขในสลิปไม่ชัดเลยค่า 😅 ช่วยพิมพ์ยอดมาให้หน่อยได้ไหมคะ?"}
@@ -338,10 +345,11 @@ ${topCat ? `- หมวดที่ใช้เงินมากสุด: ${to
     const parsed = JSON.parse(cleaned);
     if (parsed.complete === false && parsed.question) return { complete: false, question: parsed.question };
     const amount = Number(parsed.amount);
-    if (!amount || isNaN(amount) || !parsed.type || !parsed.category) throw new Error('missing fields');
+    if (!amount || isNaN(amount) || !parsed.type) throw new Error('missing fields');
+    const category = parsed.category || 'Other';
     return {
       complete: true,
-      transaction: { amount, type: parsed.type, category: parsed.category, note: parsed.note },
+      transaction: { amount, type: parsed.type, category, note: parsed.note },
       message: parsed.message ?? 'จดเรียบร้อยแล้วจ้า! ✅',
       emotion: (parsed.emotion as EmotionHint) ?? 'happy',
     };
