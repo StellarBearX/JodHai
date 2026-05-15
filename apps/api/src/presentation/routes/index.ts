@@ -6,6 +6,7 @@ import { ChatLogController } from '../controllers/ChatLogController';
 import { TransactionController } from '../controllers/TransactionController';
 import { UserController } from '../controllers/UserController';
 import { TrainingCaseController } from '../controllers/TrainingCaseController';
+import { BudgetController } from '../controllers/BudgetController';
 
 export function createRouter(
   authController: AuthController,
@@ -15,6 +16,7 @@ export function createRouter(
   transactionController: TransactionController,
   userController: UserController,
   trainingCaseController: TrainingCaseController,
+  budgetController: BudgetController,
 ): Router {
   const router = Router();
 
@@ -34,6 +36,9 @@ export function createRouter(
 
   router.get('/api/user', (req, res, next) => userController.getUser(req, res, next));
   router.put('/api/user', (req, res, next) => userController.updateUser(req, res, next));
+
+  router.get('/api/budget/categories', (req, res, next) => budgetController.getCategoryBudgets(req, res, next));
+  router.put('/api/budget/categories', (req, res, next) => budgetController.setCategoryBudgets(req, res, next));
 
   router.get('/api/training-cases', (req, res, next) => trainingCaseController.list(req, res, next));
   router.post('/api/training-cases', (req, res, next) => trainingCaseController.upsert(req, res, next));

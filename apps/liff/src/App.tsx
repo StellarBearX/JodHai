@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import History from './pages/History';
 import Chat from './pages/Chat';
 import Settings from './pages/Settings';
+import Budget from './pages/Budget';
 import Login from './pages/Login';
 import { useAppStore } from './store/useAppStore';
 
@@ -32,6 +33,7 @@ export default function App() {
 
   const handleLoginSuccess = (lineUserId: string, displayName: string) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ lineUserId, displayName }));
+    window.history.replaceState({}, '', '/');
     setUser({ lineUserId, displayName });
     setNeedLogin(false);
   };
@@ -47,6 +49,7 @@ export default function App() {
           <Route path="/history" element={<History />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/budget" element={<Budget />} />
         </Route>
       </Routes>
     </BrowserRouter>

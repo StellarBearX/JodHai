@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { DashboardSummary, Transaction, TrainingCase, User, ChatLogEntry } from '@jod-hai/shared';
+import type { CategoryBudget, DashboardSummary, Transaction, TrainingCase, User, ChatLogEntry } from '@jod-hai/shared';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3001',
@@ -78,9 +78,18 @@ export async function fetchUser(lineUserId: string): Promise<User> {
   const { data } = await api.get<User>('/api/user', { params: { lineUserId } });
   return data;
 }
-export async function updateUserSettings(lineUserId: string, settings: { budget?: number; cycleStartDay?: number }): Promise<User> {
+export async function updateUserSettings(lineUserId: string, settings: { budget?: number; cycleStartDay?: number; budgetPeriod?: string }): Promise<User> {
   const { data } = await api.put<User>('/api/user', settings, { params: { lineUserId } });
   return data;
+}
+
+// ─── Budget ───────────────────────────────────────────────────────────────────
+export async function fetchCategoryBudgets(lineUserId: string): Promise<CategoryBudget[]> {
+  const { data } = await api.get<CategoryBudget[]>('/api/budget/categories', { params: { lineUserId } });
+  return data;
+}
+export async function saveCategoryBudgets(lineUserId: string, budgets: CategoryBudget[]): Promise<void> {
+  await api.put('/api/budget/categories', budgets, { params: { lineUserId } });
 }
 
 // ─── Training Cases ───────────────────────────────────────────────────────────

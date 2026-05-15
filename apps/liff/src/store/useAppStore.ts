@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { DashboardSummary, Transaction, TrainingCase, User } from '@jod-hai/shared';
+import type { CategoryBudget, DashboardSummary, Transaction, TrainingCase, User } from '@jod-hai/shared';
 import {
   fetchDashboardSummary,
   fetchTransactions,
@@ -10,6 +10,8 @@ import {
   fetchTrainingCases,
   upsertTrainingCase,
   deleteTrainingCase,
+  fetchCategoryBudgets,
+  saveCategoryBudgets,
 } from '../services/api';
 
 interface AppState {
@@ -31,8 +33,13 @@ interface AppState {
   removeTransaction: (id: string) => Promise<void>;
 
   loadUserProfile: () => Promise<void>;
-  saveUserSettings: (settings: { budget?: number; cycleStartDay?: number }) => Promise<void>;
+  saveUserSettings: (settings: { budget?: number; cycleStartDay?: number; budgetPeriod?: string }) => Promise<void>;
   isSavingSettings: boolean;
+
+  categoryBudgets: CategoryBudget[];
+  isLoadingBudgets: boolean;
+  loadCategoryBudgets: () => Promise<void>;
+  saveCategoryBudgetsAction: (budgets: CategoryBudget[]) => Promise<void>;
 
   trainingCases: TrainingCase[];
   isLoadingTrainingCases: boolean;
@@ -120,6 +127,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     } finally {
       set({ isSavingSettings: false });
     }
+  },
+
+  categoryBudgets: [],
+  isLoadingBudgets: false,
+  loadCategoryBudgets: async () => {
+    const { user } = get();
+    if (!user) return;
+    set({ isLoadingBudgets: true });
+    try {
+      const budgets = await fetchCategoryBudgets(user.lineUserId);
+      set({ categoryBudgets: budgets });
+    } finally {
+      set({ isLoadingBudgets: false });
+    }
+  },
+  saveCategoryBudgetsAction: async (budgets) => {
+    const { user } = get();
+    if (!user) return;
+    await saveCategoryBudgets(user.lineUserId, budgets);
+    set({ categoryBudgets: budgets });
   },
 
   trainingCases: [],

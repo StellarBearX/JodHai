@@ -22,6 +22,7 @@ import { ChatLogController } from './presentation/controllers/ChatLogController'
 import { TransactionController } from './presentation/controllers/TransactionController';
 import { UserController } from './presentation/controllers/UserController';
 import { TrainingCaseController } from './presentation/controllers/TrainingCaseController';
+import { BudgetController } from './presentation/controllers/BudgetController';
 import { createRouter } from './presentation/routes';
 import { errorHandler } from './presentation/middlewares/errorHandler';
 
@@ -44,12 +45,13 @@ const chatLogController = new ChatLogController(userRepo, chatLogRepo);
 const transactionController = new TransactionController(getTransactionList, deleteTransaction, transactionRepo);
 const userController = new UserController(userRepo, updateUserSettings);
 const trainingCaseController = new TrainingCaseController(userRepo, trainingCaseRepo);
+const budgetController = new BudgetController(userRepo);
 
 const app = express();
 app.use(cors({ origin: process.env.LIFF_ORIGIN ?? '*' }));
 app.use(express.json({ limit: '10mb' }));
 
-app.use('/', createRouter(authController, dashboardController, chatController, chatLogController, transactionController, userController, trainingCaseController));
+app.use('/', createRouter(authController, dashboardController, chatController, chatLogController, transactionController, userController, trainingCaseController, budgetController));
 app.use(errorHandler);
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);

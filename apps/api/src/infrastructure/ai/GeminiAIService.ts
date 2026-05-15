@@ -72,10 +72,22 @@ const SYSTEM_PROMPT = `คุณคือ "น้องจดให้" (Nong Jo
 - "โอ้โห! ช้อปหนักมากเลยนะวันนี้ 🛍️ จดไว้ก่อนน้า"
 - "จ่ายค่าน้ำมันแล้วจ้า ⛽ ขับรถระวังด้วยนะคะ"`;
 
-const IMAGE_PROMPT = `น้องจดให้กำลังดูรูปใบเสร็จ/สลิปนี้ วิเคราะห์แล้วตอบ JSON:
+const IMAGE_PROMPT = `คุณคือน้องจดให้ กำลังดูรูปใบเสร็จหรือสลิปโอนเงิน วิเคราะห์แล้วตอบ JSON เท่านั้น
+
+กฎ category (เลือกหนึ่งอย่างเท่านั้น): Food | Transport | Shopping | Health | Entertainment | Bills | Other
+- สลิปโอนเงิน/PromptPay → Other
+- ร้านอาหาร/กาแฟ/เครื่องดื่ม → Food
+- ยา/คลินิก/โรงพยาบาล → Health
+- ห้างสรรพสินค้า/เสื้อผ้า → Shopping
+- BTS/MRT/น้ำมัน/Grab → Transport
+- ค่าไฟ/น้ำ/เน็ต → Bills
+
+กฎ note:
+- สลิปโอนเงิน → ชื่อผู้รับเงิน (ชื่อบัญชีปลายทาง)
+- ใบเสร็จร้านค้า → ชื่อร้าน
 
 [ถ้าอ่านยอดได้]:
-{"complete":true,"amount":ยอดรวม,"type":"EXPENSE","category":"หมวด","note":"รายละเอียด","message":"ข้อความน่ารักจากน้องจดให้","emotion":"happy"}
+{"complete":true,"amount":ยอดตัวเลข,"type":"EXPENSE","category":"หมวดจากลิสต์ด้านบน","note":"ชื่อผู้รับหรือร้านค้า","message":"ข้อความน่ารักสั้นๆ","emotion":"happy"}
 
 [ถ้าอ่านยอดไม่ได้]:
 {"complete":false,"question":"อ่านตัวเลขในสลิปไม่ชัดเลยค่า 😅 ช่วยพิมพ์ยอดมาให้หน่อยได้ไหมคะ?"}
@@ -87,6 +99,7 @@ export class GeminiAIService {
   private geminiClient: GoogleGenerativeAI | null = null;
   private openaiClient: OpenAI | null = null;
   private openaiModel: string = 'gpt-4o';
+  private openaiVisionModel: string = 'gpt-4o';
 
   constructor() {
     this.provider = (process.env.AI_PROVIDER ?? 'gemini') as 'gemini' | 'openai';
@@ -95,9 +108,10 @@ export class GeminiAIService {
       const baseURL = process.env.OPENAI_BASE_URL;
       const apiKey  = process.env.OPENAI_API_KEY ?? 'none';
       this.openaiModel = process.env.OPENAI_MODEL ?? 'gpt-4o';
+      this.openaiVisionModel = process.env.OPENAI_VISION_MODEL ?? this.openaiModel;
       if (baseURL) {
         this.openaiClient = new OpenAI({ baseURL, apiKey });
-        console.info(`[AI] OpenAI-compatible → ${baseURL} (${this.openaiModel})`);
+        console.info(`[AI] OpenAI-compatible → ${baseURL} (text: ${this.openaiModel}, vision: ${this.openaiVisionModel})`);
       } else {
         console.warn('[AI] AI_PROVIDER=openai but OPENAI_BASE_URL not set — rule-based fallback');
         this.provider = 'none';
@@ -193,7 +207,7 @@ export class GeminiAIService {
   private async imageOpenAI(base64Data: string, mimeType: string): Promise<ChatResponse> {
     try {
       const res = await this.openaiClient!.chat.completions.create({
-        model: this.openaiModel,
+        model: this.openaiVisionModel,
         messages: [
           {
             role: 'user',
@@ -204,9 +218,11 @@ export class GeminiAIService {
           },
         ],
       });
-      return this.parseResponse(res.choices[0]?.message?.content ?? '');
+      const raw = res.choices[0]?.message?.content ?? '';
+      console.log('[Vision] raw response:', raw);
+      return this.parseResponse(raw);
     } catch (err) {
-      console.warn('[OpenAI] image parse failed:', (err as Error).message);
+      console.warn('[Vision] image parse failed:', (err as Error).message);
       return { complete: false, question: 'อ่านรูปไม่ได้เลยค่า 😅 ช่วยพิมพ์ยอดและรายละเอียดให้หน่อยได้ไหมคะ?' };
     }
   }
@@ -328,10 +344,12 @@ ${topCat ? `- หมวดที่ใช้เงินมากสุด: ${to
     const cleaned = raw.trim().replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim();
     const parsed = JSON.parse(cleaned);
     if (parsed.complete === false && parsed.question) return { complete: false, question: parsed.question };
-    if (!parsed.amount || !parsed.type || !parsed.category) throw new Error('missing fields');
+    const amount = Number(parsed.amount);
+    if (!amount || isNaN(amount) || !parsed.type) throw new Error('missing fields');
+    const category = parsed.category || 'Other';
     return {
       complete: true,
-      transaction: { amount: parsed.amount, type: parsed.type, category: parsed.category, note: parsed.note },
+      transaction: { amount, type: parsed.type, category, note: parsed.note },
       message: parsed.message ?? 'จดเรียบร้อยแล้วจ้า! ✅',
       emotion: (parsed.emotion as EmotionHint) ?? 'happy',
     };

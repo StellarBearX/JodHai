@@ -11,20 +11,36 @@ datasource db {
 // ─── User ─────────────────────────────────────────────────────────────────────
 
 model User {
-  id            String   @id @default(uuid())
-  lineUserId    String   @unique @map("line_user_id")
-  displayName   String   @unique @map("display_name")
-  pin           String?  // bcrypt hash of 4-digit PIN
-  budget        Float?
-  cycleStartDay Int      @default(1) @map("cycle_start_day")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id              String   @id @default(uuid())
+  lineUserId      String   @unique @map("line_user_id")
+  displayName     String   @unique @map("display_name")
+  pin             String?
+  budget          Float?
+  cycleStartDay   Int      @default(1)  @map("cycle_start_day")
+  budgetPeriod    String   @default("monthly") @map("budget_period")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt    @map("updated_at")
 
-  transactions  Transaction[]
-  trainingCases TrainingCase[]
-  chatLogs      ChatLog[]
+  transactions    Transaction[]
+  trainingCases   TrainingCase[]
+  chatLogs        ChatLog[]
+  categoryBudgets CategoryBudget[]
 
   @@map("users")
+}
+
+// ─── CategoryBudget ───────────────────────────────────────────────────────────
+
+model CategoryBudget {
+  id       String @id @default(uuid())
+  userId   String @map("user_id")
+  category String
+  amount   Float
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+  @@map("category_budgets")
 }
 
 // ─── ChatLog ──────────────────────────────────────────────────────────────────
